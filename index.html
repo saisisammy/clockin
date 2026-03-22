@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EduTrack">
+<meta name="theme-color" content="#0b1120">
+<meta name="description" content="School Attendance System with Geofencing">
+<link rel="manifest" id="pwa-manifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230fd4c0'/><text y='.9em' font-size='80' x='10'>🏫</text></svg>">
+<title>EduTrack · School Attendance</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, deleteDoc, onSnapshot, orderBy, Timestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ════════════════════════════════════════════════════
+// 🔥 FIREBASE CONFIG — Replace with your own config
+// Get it free at: https://console.firebase.google.com
+// ════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyDl0XxDhlF52VVk36i0DvrVLuFrGjwIdhE",
+  authDomain: "clock-in-records.firebaseapp.com",
+  projectId: "clock-in-records",
+  storageBucket: "clock-in-records.firebasestorage.app",
+  messagingSenderId: "643705157075",
+  appId: "1:643705157075:web:03d8def9668b6e8c24ab26",
+  measurementId: "G-3P8H51DQ0N"
+};
+
+// ════════════════════════════════════════════════════
+// INIT FIREBASE
+// ════════════════════════════════════════════════════
+let app, db;
+let firebaseReady = false;
+
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  firebaseReady = true;
+} catch(e) {
+  console.warn('Firebase init failed — running in demo/local mode:', e.message);
+}
+
+// Expose to global scope
+window._firebase = { db, firebaseReady,
+  doc, getDoc, setDoc, addDoc, collection, query, where,
+  getDocs, deleteDoc, onSnapshot, orderBy, Timestamp };
+
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN SYSTEM — Warm Earthy + Electric Teal
+═══════════════════════════════════════════ */
+:root {
+  --bg:         #0b1120;
+  --bg2:        #111827;
+  --surface:    #1a2235;
+  --surface2:   #1f2a40;
+  --border:     #2a3650;
+  --border2:    #334166;
+
+  --teal:       #0fd4c0;
+  --teal-dim:   rgba(15,212,192,0.12);
+  --teal-glow:  rgba(15,212,192,0.25);
+  --amber:      #f59e0b;
+  --amber-dim:  rgba(245,158,11,0.12);
+  --rose:       #f43f5e;
+  --rose-dim:   rgba(244,63,94,0.12);
+  --sky:        #38bdf8;
+  --violet:     #8b5cf6;
+
+  --text:       #e2e8f0;
+  --text2:      #94a3b8;
+  --text3:      #64748b;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-teal: 0 0 32px rgba(15,212,192,0.2);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated background */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 40% at 15% 10%, rgba(15,212,192,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 85% 80%, rgba(139,92,246,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(17,24,39,0) 0%, var(--bg) 100%);
+}
+
+@keyframes popIn {
+  from { opacity:0; transform:scale(0.92) translateY(12px); }
+  to   { opacity:1; transform:scale(1)    translateY(0); }
+}
+
+/* Splash loader shown while Firebase connects */
+#splash {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+}
+.splash-logo-icon {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: linear-gradient(135deg, var(--teal), var(--sky));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; box-shadow: var(--shadow-teal);
+  animation: splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes splashPop {
+  from { opacity:0; transform:scale(0.6); }
+  to   { opacity:1; transform:scale(1); }
+}
+.splash-name {
+  font-size: 26px; font-weight: 800; color: var(--text);
+  animation: fadeUp 0.4s 0.15s ease both;
+}
+.splash-sub {
+  font-size: 13px; color: var(--text3);
+  animation: fadeUp 0.4s 0.25s ease both;
+}
+.splash-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border2);
+  border-top-color: var(--teal);
+  animation: spin 0.8s linear infinite, fadeUp 0.4s 0.35s ease both;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.splash-err {
+  font-size: 13px; color: var(--rose); text-align: center;
+  max-width: 280px; line-height: 1.6; display: none;
+  animation: fadeUp 0.3s ease both;
+}
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0; z-index: 200;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  background: rgba(11,17,32,0.85);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.h-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.h-logo-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal), var(--sky));
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.h-logo-name { font-size: 15px; font-weight: 800; color: var(--text); }
+.h-school { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.h-right { display: flex; align-items: center; gap: 8px; }
+.h-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); display: none; }
+@media(min-width:420px){ .h-clock { display: block; } }
+
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--teal);
+  animation: pulse 2s ease-in-out infinite;
+}
+.sync-dot.offline { background: var(--rose); animation: none; }
+@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 var(--teal-glow);} 50%{opacity:0.7;box-shadow:0 0 0 6px transparent;} }
+
+/* ── BOTTOM NAV (mobile) ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  height: 64px;
+  display: flex; align-items: stretch;
+  background: rgba(26,34,53,0.96);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.bn-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border: none; background: transparent;
+  color: var(--text3); font-size: 10px; font-weight: 600;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+}
+.bn-btn .bn-icon { font-size: 20px; transition: transform 0.2s; }
+.bn-btn.active { color: var(--teal); }
+.bn-btn.active .bn-icon { transform: translateY(-2px); }
+
+/* ── ATTRIBUTION ── */
+.attribution {
+  text-align: center;
+  padding: 10px 16px 6px;
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+  position: relative; z-index: 5;
+}
+.attribution strong { color: var(--teal); font-weight: 700; }
+
+/* ── RESPONSIVE IMPROVEMENTS ── */
+@media (max-width: 360px) {
+  .clock-btns { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .f-grid2 { grid-template-columns: 1fr; }
+  .report-controls { flex-direction: column; }
+  .report-controls .f-select { width: 100%; }
+}
+@media (max-width: 480px) {
+  header { padding: 0 14px; }
+  .page { padding: 14px 12px 80px; }
+  .zone-hero-top { padding: 12px 14px; }
+  .picker-card { padding: 14px; }
+  .a-card-body { padding: 14px; }
+  .clock-btn { padding: 16px 10px; font-size: 15px; }
+  .session-timer-val { font-size: 26px; }
+  .h-logo-name { font-size: 14px; }
+  .report-controls { gap: 6px; }
+}
+@media (hover: none) {
+  .clock-btn.can-in:hover, .clock-btn.can-out:hover { transform: none; }
+  .btn:hover { opacity: 1; }
+}
+
+/* ── PAGES ── */
+.page { display: none; padding: 20px 16px 84px; position: relative; z-index: 5; min-height: calc(100vh - 60px); }
+.page.active { display: block; }
+
+/* ── CLOCK PAGE ── */
+.zone-hero {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+}
+.zone-hero-top {
+  padding: 16px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.zone-hero-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); }
+.zone-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 100px;
+  font-size: 12px; font-weight: 700;
+  background: var(--rose-dim); color: var(--rose); border: 1px solid rgba(244,63,94,0.25);
+  transition: all 0.4s;
+}
+.zone-status.inside { background: var(--teal-dim); color: var(--teal); border-color: rgba(15,212,192,0.3); }
+.zone-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+#map-canvas { width: 100%; height: 240px; display: block; }
+
+.zone-footer {
+  padding: 10px 18px;
+  display: flex; justify-content: space-between;
+  border-top: 1px solid var(--border);
+}
+.zone-coord { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); }
+
+/* Teacher picker */
+.picker-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.picker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 12px; }
+
+.selected-chip {
+  display: none; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  margin-bottom: 12px;
+}
+.selected-chip.visible { display: flex; }
+.chip-ava {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--sky), var(--teal));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+}
+.chip-info { flex: 1; min-width: 0; }
+.chip-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-tsc { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+.chip-clear { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+
+.search-wrap { position: relative; margin-bottom: 4px; }
+.search-input {
+  width: 100%; padding: 12px 14px 12px 40px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px;
+  outline: none; transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.search-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+.search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 16px; pointer-events: none; }
+
+.t-dropdown {
+  position: absolute; top: calc(100%+4px); left: 0; right: 0; z-index: 50;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--r-md); max-height: 220px; overflow-y: auto; display: none;
+  box-shadow: var(--shadow);
+}
+.t-dropdown.open { display: block; }
+.t-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; cursor: pointer; transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+.t-item:last-child { border-bottom: none; }
+.t-item:hover, .t-item:active { background: var(--teal-dim); }
+.t-item-ava {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--sky), var(--violet));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.t-item-name { font-size: 14px; font-weight: 600; }
+.t-item-tsc { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+
+/* Clock buttons */
+.clock-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+.clock-btn {
+  padding: 20px 12px;
+  border-radius: var(--r-lg); border: 2px solid var(--border);
+  background: var(--bg2); color: var(--text3);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 17px; font-weight: 800;
+  cursor: not-allowed; transition: all 0.25s;
+  text-align: center; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.clock-btn .cb-sub { display: block; font-size: 10px; font-weight: 500; margin-top: 5px; color: var(--text3); }
+.clock-btn.can-in {
+  background: linear-gradient(135deg, rgba(15,212,192,0.15), rgba(56,189,248,0.1));
+  border-color: var(--teal); color: var(--teal);
+  cursor: pointer; box-shadow: 0 4px 20px rgba(15,212,192,0.2);
+}
+.clock-btn.can-out {
+  background: linear-gradient(135deg, rgba(244,63,94,0.15), rgba(245,158,11,0.1));
+  border-color: var(--rose); color: var(--rose);
+  cursor: pointer; box-shadow: 0 4px 20px rgba(244,63,94,0.2);
+}
+.clock-btn.can-in:active { transform: scale(0.97); }
+.clock-btn.can-out:active { transform: scale(0.97); }
+
+/* Session timer */
+.session-banner {
+  display: none;
+  background: linear-gradient(135deg, var(--teal-dim), rgba(56,189,248,0.08));
+  border: 1px solid rgba(15,212,192,0.25);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  text-align: center;
+  margin-top: 14px;
+  animation: fadeUp 0.3s ease;
+}
+.session-banner.active { display: block; }
+.session-timer-val { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; color: var(--teal); }
+.session-timer-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+.session-timer-who { font-size: 13px; color: var(--text2); margin-top: 6px; font-weight: 600; }
+
+/* Today log */
+.section-title { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.log-list { display: flex; flex-direction: column; gap: 8px; }
+.log-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+  animation: fadeUp 0.3s ease;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.log-card-ava {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+}
+.log-card-ava.in  { background: linear-gradient(135deg, var(--teal), var(--sky)); }
+.log-card-ava.out { background: linear-gradient(135deg, var(--rose), var(--amber)); }
+.log-info { flex: 1; min-width: 0; }
+.log-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log-time { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+.log-badge {
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
+}
+.log-badge.in  { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(15,212,192,0.2); }
+.log-badge.out { background: var(--rose-dim); color: var(--rose); border: 1px solid rgba(244,63,94,0.2); }
+
+/* Geo error */
+.geo-err {
+  display: none; padding: 10px 14px; border-radius: var(--r-sm);
+  background: var(--rose-dim); border: 1px solid rgba(244,63,94,0.3);
+  color: #fca5a5; font-size: 12px; margin-bottom: 12px; line-height: 1.5;
+}
+.geo-err.show { display: block; }
+
+/* ── ADMIN PAGE ── */
+.admin-tabs {
+  display: flex; gap: 6px; overflow-x: auto;
+  scrollbar-width: none; margin-bottom: 20px;
+}
+.admin-tabs::-webkit-scrollbar { display: none; }
+.a-tab {
+  flex-shrink: 0; padding: 8px 16px; border-radius: 100px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text3); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.a-tab.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
+
+.a-section { display: none; }
+.a-section.active { display: block; }
+
+/* Cards */
+.a-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.a-card-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.a-card-title { font-size: 13px; font-weight: 700; color: var(--text2); }
+.a-card-body { padding: 18px; }
+
+/* Stats row */
+.stats-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 16px; }
+@media(min-width:480px){ .stats-row { grid-template-columns: repeat(4,1fr); } }
+.stat-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  text-align: center;
+}
+.stat-num { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 600; color: var(--teal); }
+.stat-lbl { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* Form */
+.f-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 6px; }
+.f-input {
+  width: 100%; padding: 12px 14px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px;
+  outline: none; transition: all 0.2s; -webkit-appearance: none;
+}
+.f-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+.f-row { margin-bottom: 14px; }
+.f-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Buttons */
+.btn { padding: 11px 20px; border-radius: var(--r-md); border: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+.btn-teal { background: var(--teal); color: #0b1120; }
+.btn-teal:hover { opacity: 0.88; }
+.btn-teal:active { transform: scale(0.97); }
+.btn-ghost { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); }
+.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+.btn-danger { background: var(--rose-dim); border: 1px solid rgba(244,63,94,0.3); color: var(--rose); }
+.btn-danger:hover { background: rgba(244,63,94,0.2); }
+.btn-sm { padding: 7px 14px; font-size: 13px; }
+.btn-full { width: 100%; }
+
+/* Teacher list */
+.teacher-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.teacher-item:last-child { border-bottom: none; }
+.t-ava {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--sky), var(--violet));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+}
+.t-name { font-size: 15px; font-weight: 700; }
+.t-meta { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+.t-sessions { font-size: 12px; color: var(--text3); margin-left: auto; margin-right: 10px; white-space: nowrap; }
+
+/* Report table */
+.report-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.report-tbl th { padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.report-tbl td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.report-tbl tr:last-child td { border-bottom: none; }
+.report-tbl tr:hover td { background: rgba(255,255,255,0.02); }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Badges */
+.tsc-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 7px; border-radius: 4px; background: rgba(139,92,246,0.12); color: var(--violet); border: 1px solid rgba(139,92,246,0.2); }
+.unr-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 7px; border-radius: 4px; background: rgba(100,116,139,0.12); color: var(--text3); }
+.in-badge  { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; background: var(--teal-dim); color: var(--teal); }
+.out-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; background: var(--rose-dim); color: var(--rose); }
+
+/* Individual stats */
+.ind-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ind-bar-lbl { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text3); width: 80px; flex-shrink: 0; }
+.ind-bar-wrap { flex: 1; height: 16px; background: var(--border); border-radius: 100px; overflow: hidden; }
+.ind-bar-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--sky), var(--teal)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+.ind-bar-count { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text3); width: 24px; text-align: right; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 100px; padding: 11px 22px;
+  font-size: 13px; font-weight: 600;
+  z-index: 9999; opacity: 0; pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  white-space: nowrap; max-width: calc(100vw - 40px);
+  box-shadow: var(--shadow);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Modal */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.65);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+.modal-bg.open { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--r-xl); padding: 28px;
+  width: 100%; max-width: 360px;
+  animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.modal-text { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.6; }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Login */
+.login-full {
+  position: fixed; inset: 0; z-index: 400;
+  background: var(--bg); display: none; align-items: center; justify-content: center; padding: 24px;
+}
+.login-full.show { display: flex; }
+.login-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--r-xl); padding: 32px 28px;
+  width: 100%; max-width: 380px;
+  animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.login-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+.login-err { font-size: 12px; color: var(--rose); margin-bottom: 10px; display: none; }
+
+/* Empty */
+.empty { text-align: center; padding: 32px 16px; }
+.empty-icon { font-size: 36px; margin-bottom: 8px; }
+.empty-text { font-size: 14px; color: var(--text3); }
+
+/* Offline banner */
+.offline-bar {
+  background: var(--amber-dim); border-bottom: 1px solid rgba(245,158,11,0.2);
+  padding: 8px 16px; text-align: center; font-size: 12px; color: #fcd34d;
+  display: none; position: relative; z-index: 6;
+}
+.offline-bar.show { display: block; }
+
+/* Select */
+.f-select {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px;
+  outline: none; -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+  padding-right: 36px;
+}
+.f-select:focus { border-color: var(--teal); }
+
+/* Report controls */
+.report-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Attribution */
+.attribution {
+  text-align: center;
+  padding: 10px 16px 6px;
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+  position: relative; z-index: 5;
+}
+.attribution span { color: var(--teal); font-weight: 700; }
+
+/* PWA install banner */
+.pwa-banner {
+  display: none;
+  position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 300;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  animation: fadeUp 0.3s ease;
+  align-items: center; gap: 12px;
+}
+.pwa-banner.show { display: flex; }
+.pwa-banner-icon { font-size: 28px; flex-shrink: 0; }
+.pwa-banner-text { flex: 1; }
+.pwa-banner-title { font-size: 14px; font-weight: 700; }
+.pwa-banner-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.pwa-banner-btns { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* Responsive improvements */
+@media (max-width: 360px) {
+  .clock-btns { grid-template-columns: 1fr; }
+  .clock-btn { padding: 16px 12px; font-size: 15px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  header { padding: 0 12px; }
+  .page { padding: 14px 12px 84px; }
+}
+@media (min-width: 768px) {
+  .page { max-width: 680px; margin: 0 auto; }
+  .clock-btns { gap: 16px; }
+  .clock-btn { padding: 24px 16px; font-size: 18px; }
+}
+@media (min-width: 1024px) {
+  .page { max-width: 860px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SPLASH LOADER ══ -->
+<div id="splash">
+  <div class="splash-logo-icon">🏫</div>
+  <div class="splash-name">EduTrack</div>
+  <div class="splash-sub">School Attendance System</div>
+  <div class="splash-spinner" id="splash-spinner"></div>
+  <div class="splash-err" id="splash-err"></div>
+</div>
+
+<!-- ══ OFFLINE BANNER ══ -->
+<div class="offline-bar" id="offline-bar">⚠️ No cloud connection — changes saved locally only</div>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="h-logo">
+    <div class="h-logo-icon">🏫</div>
+    <div>
+      <div class="h-logo-name">EduTrack</div>
+      <div class="h-school" id="h-school-name">Loading…</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <div class="h-clock" id="h-clock">--:--:--</div>
+    <div class="sync-dot" id="sync-dot" title="Cloud sync status"></div>
+  </div>
+</header>
+
+<!-- ══ CLOCK PAGE ══ -->
+<div class="page active" id="page-clock">
+
+  <div class="geo-err" id="geo-err"></div>
+
+  <!-- Zone map -->
+  <div class="zone-hero">
+    <div class="zone-hero-top">
+      <span class="zone-hero-label">📍 School Zone</span>
+      <div class="zone-status" id="zone-status">
+        <div class="zone-status-dot"></div>
+        <span id="zone-status-txt">Outside Zone</span>
+      </div>
+    </div>
+    <canvas id="map-canvas"></canvas>
+    <div class="zone-footer">
+      <span class="zone-coord" id="coord-txt">Lat: — / Lng: —</span>
+      <span class="zone-coord" id="dist-txt" style="color:var(--sky)">Distance: —</span>
+    </div>
+  </div>
+
+  <!-- Teacher picker -->
+  <div class="picker-card">
+    <div class="picker-label">👤 Select Your Name</div>
+
+    <div class="selected-chip" id="sel-chip">
+      <div class="chip-ava" id="sel-chip-ava">?</div>
+      <div class="chip-info">
+        <div class="chip-name" id="sel-chip-name">—</div>
+        <div class="chip-tsc" id="sel-chip-tsc">—</div>
+      </div>
+      <button class="chip-clear" onclick="clearTeacher()">✕</button>
+    </div>
+
+    <div class="search-wrap" id="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="t-search" placeholder="Search your name…"
+        autocomplete="off" oninput="filterTeachers(this.value)" onfocus="openDD()" onblur="schedClose()">
+      <div class="t-dropdown" id="t-dropdown"></div>
+    </div>
+
+    <div class="clock-btns">
+      <button class="clock-btn" id="btn-in" disabled onclick="doClockIn()">
+        🟢 CLOCK IN<span class="cb-sub" id="sub-in">select name first</span>
+      </button>
+      <button class="clock-btn" id="btn-out" disabled onclick="doClockOut(false)">
+        🔴 CLOCK OUT<span class="cb-sub" id="sub-out">select name first</span>
+      </button>
+    </div>
+
+    <div class="session-banner" id="session-banner">
+      <div class="session-timer-val" id="session-val">00:00:00</div>
+      <div class="session-timer-label">Session Duration</div>
+      <div class="session-timer-who" id="session-who"></div>
+    </div>
+  </div>
+
+  <!-- Today's log -->
+  <div class="section-title">📋 Today's Activity <span style="font-size:11px;color:var(--text3);font-weight:500;" id="today-lbl"></span></div>
+  <div class="log-list" id="today-log">
+    <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet today</div></div>
+  </div>
+</div>
+
+<!-- ══ ADMIN PAGE ══ -->
+<div class="page" id="page-admin">
+  <div class="admin-tabs">
+    <div class="a-tab active" onclick="aNav('overview','this')">Overview</div>
+    <div class="a-tab" onclick="aNav('teachers','this')">Teachers</div>
+    <div class="a-tab" onclick="aNav('reports','this')">Reports</div>
+    <div class="a-tab" onclick="aNav('individual','this')">Individual</div>
+    <div class="a-tab" onclick="aNav('settings','this')">Settings</div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="a-section active" id="asec-overview">
+    <div class="stats-row" id="stats-row">
+      <div class="stat-pill"><div class="stat-num" id="stat-teachers">0</div><div class="stat-lbl">Teachers</div></div>
+      <div class="stat-pill"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">Today's Check-ins</div></div>
+      <div class="stat-pill"><div class="stat-num" id="stat-present">0</div><div class="stat-lbl">Currently In</div></div>
+      <div class="stat-pill"><div class="stat-num" id="stat-week">0</div><div class="stat-lbl">This Week</div></div>
+    </div>
+    <div class="section-title">📋 Recent Activity</div>
+    <div class="log-list" id="admin-recent-log">
+      <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet</div></div>
+    </div>
+  </div>
+
+  <!-- TEACHERS -->
+  <div class="a-section" id="asec-teachers">
+    <div class="a-card">
+      <div class="a-card-head">
+        <span class="a-card-title">Registered Teachers</span>
+        <button class="btn btn-teal btn-sm" onclick="toggleAddForm()">+ Add Teacher</button>
+      </div>
+      <div id="add-form-wrap" style="display:none;padding:18px;border-bottom:1px solid var(--border);">
+        <div class="f-row">
+          <label class="f-label">Full Name *</label>
+          <input type="text" class="f-input" id="new-name" placeholder="e.g. Jane Wanjiku Kamau">
+        </div>
+        <div class="f-row">
+          <label class="f-label">TSC Number (optional)</label>
+          <input type="text" class="f-input" id="new-tsc" placeholder="e.g. TSC/123456">
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-teal" onclick="addTeacher()">Add Teacher</button>
+          <button class="btn btn-ghost" onclick="toggleAddForm()">Cancel</button>
+        </div>
+      </div>
+      <div class="a-card-body" id="teachers-list">
+        <div class="empty"><div class="empty-icon">👥</div><div class="empty-text">No teachers yet</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="a-section" id="asec-reports">
+    <div class="a-card">
+      <div class="a-card-head"><span class="a-card-title">Attendance Report</span></div>
+      <div class="a-card-body">
+        <div class="report-controls">
+          <select class="f-select" id="rpt-period" onchange="renderReport()" style="flex:1;min-width:120px;">
+            <option value="daily">Today</option>
+            <option value="weekly">This Week</option>
+            <option value="monthly">This Month</option>
+          </select>
+          <select class="f-select" id="rpt-teacher" onchange="renderReport()" style="flex:2;min-width:140px;">
+            <option value="all">All Teachers</option>
+          </select>
+          <button class="btn btn-teal btn-sm" onclick="exportPDF()">⬇ PDF</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="report-tbl" id="rpt-table">
+            <thead>
+              <tr>
+                <th>Teacher</th>
+                <th>Date</th>
+                <th>In</th>
+                <th>Out</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="rpt-body"></tbody>
+          </table>
+          <div class="empty" id="rpt-empty" style="display:none;"><div class="empty-icon">📄</div><div class="empty-text">No records for this period</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INDIVIDUAL -->
+  <div class="a-section" id="asec-individual">
+    <div class="f-row">
+      <label class="f-label">Select Teacher</label>
+      <select class="f-select" id="ind-sel" onchange="renderIndividual()">
+        <option value="">— Choose teacher —</option>
+      </select>
+    </div>
+    <div id="ind-content">
+      <div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Select a teacher to view statistics</div></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="a-section" id="asec-settings">
+    <div class="a-card">
+      <div class="a-card-head"><span class="a-card-title">⚙️ School Configuration</span></div>
+      <div class="a-card-body">
+        <div class="f-row">
+          <label class="f-label">School Name</label>
+          <input type="text" class="f-input" id="s-name" placeholder="e.g. Sunrise Primary School">
+        </div>
+        <div class="f-grid2">
+          <div class="f-row">
+            <label class="f-label">Latitude</label>
+            <input type="number" class="f-input" id="s-lat" placeholder="-1.286389" step="0.000001">
+          </div>
+          <div class="f-row">
+            <label class="f-label">Longitude</label>
+            <input type="number" class="f-input" id="s-lng" placeholder="36.817223" step="0.000001">
+          </div>
+        </div>
+        <div class="f-row">
+          <label class="f-label">Geofence Radius (meters)</label>
+          <input type="number" class="f-input" id="s-radius" value="300" min="50" max="2000">
+        </div>
+        <div class="f-row">
+          <label class="f-label">Admin PIN (min 4 digits)</label>
+          <input type="password" class="f-input" id="s-pin" placeholder="••••" maxlength="8">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-teal" onclick="saveSettings()">💾 Save Settings</button>
+          <button class="btn btn-ghost" onclick="useMyLocation()">📍 Use My GPS Location</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ATTRIBUTION ══ -->
+
+<!-- ══ BOTTOM NAV ══ -->
+<nav class="bottom-nav">
+  <button class="bn-btn active" id="bn-clock" onclick="goPage('clock')">
+    <span class="bn-icon">⏱</span>Clock In/Out
+  </button>
+  <button class="bn-btn" id="bn-admin" onclick="requireAdmin()">
+    <span class="bn-icon">🛡</span>Admin
+  </button>
+</nav>
+
+<!-- Admin login -->
+<div class="login-full" id="login-screen">
+  <div class="login-box">
+    <div class="login-title">Admin Dashboard</div>
+    <div class="login-sub">Enter your admin PIN to continue</div>
+    <div class="f-row">
+      <label class="f-label">PIN</label>
+      <input type="password" class="f-input" id="pin-input" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-err" id="login-err">Incorrect PIN. Try again.</div>
+    <button class="btn btn-teal btn-full" onclick="doLogin()" style="margin-bottom:10px;">Enter Dashboard</button>
+    <button class="btn btn-ghost btn-full" onclick="closeLogin()">Cancel</button>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-bg" id="del-modal">
+  <div class="modal-box">
+    <div class="modal-title">Delete Teacher?</div>
+    <div class="modal-text" id="del-modal-txt">This will permanently delete the teacher and all their records.</div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost btn-sm" onclick="closeDelModal()">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PWA Install Banner -->
+<div class="pwa-banner" id="pwa-banner">
+  <div class="pwa-banner-icon">🏫</div>
+  <div class="pwa-banner-text">
+    <div class="pwa-banner-title">Install EduTrack</div>
+    <div class="pwa-banner-sub">Add to home screen for quick access</div>
+  </div>
+  <div class="pwa-banner-btns">
+    <button class="btn btn-teal btn-sm" id="pwa-install-btn">Install</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pwa-banner').classList.remove('show')">✕</button>
+  </div>
+</div>
+
+<!-- Attribution -->
+<div class="attribution">Powered by <span>Mr. Saisi Nyongesa Sammy</span></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CORE STATE
+// ═══════════════════════════════════════════════════════
+let DB_MODE = 'local'; // 'firebase' | 'local'
+let fb = null; // firebase refs
+
+let settings  = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234' };
+let teachers  = [];
+let records   = [];
+let activeSessions = {};
+
+let userPos = null, isInside = false;
+let selectedTeacher = null;
+let adminLoggedIn = false;
+let sessionInterval = null;
+let pendingDeleteId = null;
+
+// ═══════════════════════════════════════════════════════
+//  AUTO LAUNCH — connects to Firebase immediately
+// ═══════════════════════════════════════════════════════
+async function autoLaunch() {
+  if (window._firebase?.firebaseReady) {
+    // Firebase config is baked in — connect directly
+    DB_MODE = 'firebase';
+    fb = window._firebase;
+    try {
+      await loadFromFirebase();
+      launchApp();
+      listenFirebase();
+    } catch(e) {
+      console.warn('Firebase failed, falling back to local:', e);
+      DB_MODE = 'local';
+      loadLocal();
+      launchApp();
+      showOfflineBanner(true);
+    }
+  } else {
+    // Firebase module not ready yet — wait for event
+    window.addEventListener('firebase-ready', () => autoLaunch());
+  }
+}
+
+function launchApp() {
+  const splash = document.getElementById('splash');
+  splash.style.opacity = '0';
+  splash.style.transition = 'opacity 0.4s ease';
+  setTimeout(() => splash.style.display = 'none', 400);
+  applySettings();
+  startGPS();
+  renderTodayLog();
+  renderTeacherDropdown('');
+  setInterval(updateClock, 1000);
+  updateClock();
+  document.getElementById('today-lbl').textContent = new Date().toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'});
+  updateSyncDot();
+}
+
+// Kick off immediately
+autoLaunch();
+
+// ═══════════════════════════════════════════════════════
+//  LOCAL STORAGE
+// ═══════════════════════════════════════════════════════
+function loadLocal() {
+  const load = (k,d) => { try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
+  settings       = load('et_settings', settings);
+  teachers       = load('et_teachers', []);
+  records        = load('et_records', []);
+  activeSessions = load('et_sessions', {});
+}
+function saveLocal() {
+  const save = (k,v) => { try{localStorage.setItem(k,JSON.stringify(v));}catch{} };
+  save('et_settings', settings);
+  save('et_teachers', teachers);
+  save('et_records', records);
+  save('et_sessions', activeSessions);
+}
+
+// ═══════════════════════════════════════════════════════
+//  FIREBASE OPERATIONS
+// ═══════════════════════════════════════════════════════
+async function loadFromFirebase() {
+  const { db, collection, getDocs, doc, getDoc } = fb;
+  try {
+    // Settings
+    const snap = await getDoc(doc(db,'school','settings'));
+    if (snap.exists()) settings = {...settings, ...snap.data()};
+
+    // Teachers
+    const ts = await getDocs(collection(db,'teachers'));
+    teachers = ts.docs.map(d => ({id:d.id,...d.data()}));
+
+    // Records (last 90 days)
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-90);
+    const rs = await getDocs(collection(db,'records'));
+    records = rs.docs.map(d => ({id:d.id,...d.data()}))
+      .filter(r => new Date(r.ts) > cutoff)
+      .sort((a,b) => new Date(a.ts)-new Date(b.ts));
+
+    // Active sessions
+    const as = await getDocs(collection(db,'sessions'));
+    activeSessions = {};
+    as.docs.forEach(d => { activeSessions[d.id] = d.data().ts; });
+
+    showToast('☁️ Cloud data loaded');
+  } catch(e) {
+    console.error('Firebase load error:', e);
+    loadLocal();
+    showOfflineBanner(true);
+  }
+}
+
+function listenFirebase() {
+  if (!fb?.db) return;
+  const { db, collection, onSnapshot, orderBy, query } = fb;
+
+  // Listen to records in real time
+  onSnapshot(collection(db,'records'), snap => {
+    records = snap.docs.map(d => ({id:d.id,...d.data()}))
+      .sort((a,b) => new Date(a.ts)-new Date(b.ts));
+    renderTodayLog();
+    if (adminLoggedIn) refreshAdminViews();
+  });
+
+  // Listen to teachers
+  onSnapshot(collection(db,'teachers'), snap => {
+    teachers = snap.docs.map(d => ({id:d.id,...d.data()}));
+    renderTeacherDropdown('');
+    if (adminLoggedIn) refreshAdminViews();
+  });
+
+  // Sessions
+  onSnapshot(collection(db,'sessions'), snap => {
+    activeSessions = {};
+    snap.docs.forEach(d => { activeSessions[d.id] = d.data().ts; });
+    updateClockButtons();
+  });
+}
+
+async function fbSaveSettings() {
+  if (!fb?.db) return;
+  const { db, doc, setDoc } = fb;
+  await setDoc(doc(db,'school','settings'), settings);
+}
+
+async function fbAddTeacher(t) {
+  if (!fb?.db) return;
+  const { db, doc, setDoc } = fb;
+  await setDoc(doc(db,'teachers',t.id), t);
+}
+
+async function fbDeleteTeacher(id) {
+  if (!fb?.db) return;
+  const { db, doc, deleteDoc, collection, getDocs, query, where } = fb;
+  await deleteDoc(doc(db,'teachers',id));
+  const rs = await getDocs(fb.query(collection(db,'records'), fb.where('teacherId','==',id)));
+  for (const r of rs.docs) await deleteDoc(doc(db,'records',r.id));
+  await deleteDoc(doc(db,'sessions',id));
+}
+
+async function fbAddRecord(r) {
+  if (!fb?.db) return;
+  const { db, doc, setDoc } = fb;
+  await setDoc(doc(db,'records',r.id), r);
+}
+
+async function fbSetSession(teacherId, ts) {
+  if (!fb?.db) return;
+  const { db, doc, setDoc, deleteDoc } = fb;
+  if (ts) await setDoc(doc(db,'sessions',teacherId), {ts});
+  else await deleteDoc(doc(db,'sessions',teacherId));
+}
+
+// ═══════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════
+function applySettings() {
+  document.getElementById('h-school-name').textContent = settings.schoolName || 'No school set';
+  document.getElementById('s-name').value   = settings.schoolName || '';
+  document.getElementById('s-lat').value    = settings.lat  || '';
+  document.getElementById('s-lng').value    = settings.lng  || '';
+  document.getElementById('s-radius').value = settings.radius || 300;
+}
+
+async function saveSettings() {
+  const name = document.getElementById('s-name').value.trim();
+  const lat  = parseFloat(document.getElementById('s-lat').value);
+  const lng  = parseFloat(document.getElementById('s-lng').value);
+  const rad  = parseInt(document.getElementById('s-radius').value) || 300;
+  const pin  = document.getElementById('s-pin').value.trim();
+  if (!name) { showToast('⚠️ School name required'); return; }
+  if (isNaN(lat)||isNaN(lng)) { showToast('⚠️ Valid coordinates required'); return; }
+  settings = {...settings, schoolName:name, lat, lng, radius:rad, ...(pin.length>=4?{pin}:{}) };
+  saveLocal();
+  if (DB_MODE==='firebase') await fbSaveSettings();
+  applySettings(); drawMap(); updateClockButtons();
+  showToast('✅ Settings saved & synced');
+}
+
+function useMyLocation() {
+  if (!navigator.geolocation) { showToast('❌ Geolocation not supported'); return; }
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('s-lat').value = p.coords.latitude.toFixed(6);
+    document.getElementById('s-lng').value = p.coords.longitude.toFixed(6);
+    showToast('📍 GPS coordinates filled');
+  }, err => showToast('❌ ' + geoErrMsg(err)), {enableHighAccuracy:true,timeout:10000});
+}
+
+// ═══════════════════════════════════════════════════════
+//  GPS
+// ═══════════════════════════════════════════════════════
+function startGPS() {
+  if (!navigator.geolocation) { showGeoErr('Geolocation not supported by this browser.'); return; }
+  navigator.geolocation.watchPosition(onGPS, onGPSErr, {enableHighAccuracy:true, maximumAge:4000, timeout:12000});
+}
+
+function onGPS(pos) {
+  document.getElementById('geo-err').classList.remove('show');
+  userPos = {lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy};
+  document.getElementById('coord-txt').textContent = `${userPos.lat.toFixed(5)}, ${userPos.lng.toFixed(5)}`;
+  if (settings.lat && settings.lng) {
+    const d = haversine(userPos, {lat:settings.lat, lng:settings.lng});
+    document.getElementById('dist-txt').textContent = `${Math.round(d)}m away`;
+    const was = isInside;
+    isInside = d <= settings.radius;
+    if (isInside !== was) onZoneChange();
+  }
+  drawMap(); updateClockButtons();
+}
+function onGPSErr(e) { showGeoErr(geoErrMsg(e)); }
+function geoErrMsg(e) {
+  return {1:'Location permission denied. Allow access in browser settings.',
+          2:'GPS unavailable. Enable location services.',
+          3:'Location timed out. Try again.'}[e.code] || `GPS error (${e.code})`;
+}
+function showGeoErr(m) { const el=document.getElementById('geo-err'); el.textContent='⚠️ '+m; el.classList.add('show'); }
+
+function onZoneChange() {
+  const s = document.getElementById('zone-status');
+  const t = document.getElementById('zone-status-txt');
+  if (isInside) { s.classList.add('inside'); t.textContent='Inside Zone'; showToast('✅ You are inside the school zone'); }
+  else { s.classList.remove('inside'); t.textContent='Outside Zone'; showToast('⚠️ You left the school zone');
+    if (selectedTeacher && activeSessions[selectedTeacher.id]) doClockOut(true); }
+  updateClockButtons();
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAP CANVAS
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() { canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight; drawMap(); }
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 100);
+
+function drawMap() {
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#08101e'; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='rgba(15,212,192,0.04)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  if (!settings.lat||!settings.lng) {
+    ctx.fillStyle='rgba(100,116,139,0.5)'; ctx.font='600 13px Plus Jakarta Sans,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('School location not configured', W/2, H/2-8);
+    ctx.font='11px JetBrains Mono,monospace'; ctx.fillStyle='rgba(100,116,139,0.35)';
+    ctx.fillText('Admin → Settings → Set coordinates', W/2, H/2+14);
+    return;
+  }
+
+  const cx=W/2, cy=H/2;
+  const scale = (Math.min(W,H)*0.36) / settings.radius;
+  const r = settings.radius * scale;
+
+  // Outer glow
+  const g=ctx.createRadialGradient(cx,cy,r*.3,cx,cy,r*1.8);
+  g.addColorStop(0, isInside ? 'rgba(15,212,192,0.09)' : 'rgba(56,189,248,0.06)');
+  g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r*1.8,0,Math.PI*2); ctx.fill();
+
+  // Zone
+  ctx.fillStyle = isInside ? 'rgba(15,212,192,0.07)' : 'rgba(56,189,248,0.05)';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = isInside ? 'rgba(15,212,192,0.55)' : 'rgba(56,189,248,0.4)';
+  ctx.lineWidth=1.5; ctx.setLineDash([6,5]);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // School pin
+  ctx.fillStyle='rgba(56,189,248,0.9)'; ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(56,189,248,0.2)'; ctx.lineWidth=10;
+  ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(56,189,248,0.8)'; ctx.font='600 11px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
+  ctx.fillText(settings.schoolName||'School', cx, cy-r-10);
+  ctx.font='10px JetBrains Mono,monospace'; ctx.fillStyle='rgba(56,189,248,0.4)';
+  ctx.fillText(`r=${settings.radius}m`, cx+r*.28, cy-5);
+
+  // User
+  if (userPos && settings.lat && settings.lng) {
+    const mLat=110540, mLng=111320*Math.cos(settings.lat*Math.PI/180);
+    const ux=cx+(userPos.lng-settings.lng)*mLng*scale;
+    const uy=cy-(userPos.lat-settings.lat)*mLat*scale;
+    ctx.strokeStyle=isInside?'rgba(15,212,192,0.2)':'rgba(244,63,94,0.2)';
+    ctx.lineWidth=1; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ux,uy); ctx.stroke();
+    ctx.setLineDash([]);
+    const ug=ctx.createRadialGradient(ux,uy,0,ux,uy,15);
+    ug.addColorStop(0,isInside?'rgba(15,212,192,0.4)':'rgba(244,63,94,0.4)'); ug.addColorStop(1,'transparent');
+    ctx.fillStyle=ug; ctx.beginPath(); ctx.arc(ux,uy,15,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=isInside?'#0fd4c0':'#f43f5e';
+    ctx.beginPath(); ctx.arc(ux,uy,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=isInside?'rgba(15,212,192,0.9)':'rgba(244,63,94,0.9)';
+    ctx.font='700 10px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(selectedTeacher?initials(selectedTeacher.name):'YOU', ux, uy-13);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TEACHER SEARCH
+// ═══════════════════════════════════════════════════════
+function renderTeacherDropdown(q) {
+  const dd = document.getElementById('t-dropdown');
+  const list = q.trim() ? teachers.filter(t=>t.name.toLowerCase().includes(q.toLowerCase())) : teachers;
+  if (!list.length) { dd.innerHTML='<div class="t-item" style="color:var(--text3);cursor:default;">No teachers found</div>'; return; }
+  dd.innerHTML = list.map(t=>`
+    <div class="t-item" onclick="selectTeacher('${t.id}')">
+      <div class="t-item-ava">${initials(t.name)}</div>
+      <div>
+        <div class="t-item-name">${esc(t.name)}</div>
+        <div class="t-item-tsc">${t.tsc?t.tsc:'Not TSC registered'}</div>
+      </div>
+    </div>`).join('');
+}
+
+function filterTeachers(q) { renderTeacherDropdown(q); }
+function openDD() { document.getElementById('t-dropdown').classList.add('open'); renderTeacherDropdown(document.getElementById('t-search').value); }
+let closeT;
+function schedClose() { closeT=setTimeout(()=>document.getElementById('t-dropdown').classList.remove('open'),200); }
+
+function selectTeacher(id) {
+  clearTimeout(closeT);
+  const t = teachers.find(t=>t.id===id);
+  if (!t) return;
+  selectedTeacher = t;
+  document.getElementById('t-dropdown').classList.remove('open');
+  document.getElementById('t-search').value='';
+  document.getElementById('sel-chip-ava').textContent = initials(t.name);
+  document.getElementById('sel-chip-name').textContent = t.name;
+  document.getElementById('sel-chip-tsc').textContent = t.tsc ? `TSC: ${t.tsc}` : 'Not TSC registered';
+  document.getElementById('sel-chip').classList.add('visible');
+  document.getElementById('search-wrap').style.display='none';
+  updateClockButtons(); drawMap();
+  if (activeSessions[t.id]) startSessionTimer(t);
+  else stopSessionTimer();
+}
+
+function clearTeacher() {
+  selectedTeacher=null;
+  document.getElementById('sel-chip').classList.remove('visible');
+  document.getElementById('search-wrap').style.display='block';
+  stopSessionTimer(); updateClockButtons(); drawMap();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CLOCK BUTTONS
+// ═══════════════════════════════════════════════════════
+function updateClockButtons() {
+  const bi=document.getElementById('btn-in'), bo=document.getElementById('btn-out');
+  const si=document.getElementById('sub-in'),  so=document.getElementById('sub-out');
+  bi.className='clock-btn'; bo.className='clock-btn';
+  bi.disabled=true; bo.disabled=true;
+
+  if (!selectedTeacher) { si.textContent=so.textContent='select name first'; return; }
+  if (!settings.lat||!settings.lng) { si.textContent=so.textContent='school location not set'; return; }
+  const clocked = !!activeSessions[selectedTeacher.id];
+  if (!isInside) {
+    si.textContent=`outside ${settings.radius}m zone`; so.textContent=`outside ${settings.radius}m zone`;
+    if (clocked) { bo.className='clock-btn can-out'; bo.disabled=false; so.textContent='clock out'; }
+    return;
+  }
+  if (!clocked) {
+    bi.className='clock-btn can-in'; bi.disabled=false; si.textContent=settings.schoolName||'school zone';
+    so.textContent='not clocked in';
+  } else {
+    bo.className='clock-btn can-out'; bo.disabled=false; so.textContent=settings.schoolName||'school zone';
+    si.textContent='already clocked in';
+  }
+}
+
+async function doClockIn() {
+  const t=selectedTeacher;
+  if (!t||activeSessions[t.id]) return;
+  const now=new Date();
+  const rec={id:uid(),teacherId:t.id,type:'in',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng};
+  records.push(rec); activeSessions[t.id]=now.toISOString();
+  saveLocal();
+  if (DB_MODE==='firebase') { await fbAddRecord(rec); await fbSetSession(t.id,now.toISOString()); }
+  startSessionTimer(t); updateClockButtons(); renderTodayLog();
+  showToast(`🟢 ${t.name} clocked in`);
+}
+
+async function doClockOut(auto) {
+  const t=selectedTeacher;
+  if (!t||!activeSessions[t.id]) return;
+  const now=new Date();
+  const rec={id:uid(),teacherId:t.id,type:'out',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng};
+  records.push(rec); delete activeSessions[t.id];
+  saveLocal();
+  if (DB_MODE==='firebase') { await fbAddRecord(rec); await fbSetSession(t.id,null); }
+  stopSessionTimer(); updateClockButtons(); renderTodayLog();
+  showToast(auto?`🔴 ${t.name} auto clocked out`:`🔴 ${t.name} clocked out`);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SESSION TIMER
+// ═══════════════════════════════════════════════════════
+function startSessionTimer(t) {
+  stopSessionTimer();
+  document.getElementById('session-banner').classList.add('active');
+  document.getElementById('session-who').textContent = t.name;
+  sessionInterval = setInterval(()=>{
+    if (!activeSessions[t.id]) { stopSessionTimer(); return; }
+    const e=Math.floor((Date.now()-new Date(activeSessions[t.id]))/1000);
+    document.getElementById('session-val').textContent=fmtSec(e);
+  },1000);
+}
+function stopSessionTimer() {
+  clearInterval(sessionInterval);
+  document.getElementById('session-banner').classList.remove('active');
+  document.getElementById('session-val').textContent='00:00:00';
+}
+
+// ═══════════════════════════════════════════════════════
+//  TODAY LOG
+// ═══════════════════════════════════════════════════════
+function renderTodayLog() {
+  const today=new Date().toDateString();
+  const recs=records.filter(r=>new Date(r.ts).toDateString()===today)
+    .sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const el=document.getElementById('today-log');
+  if (!recs.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records today yet</div></div>'; return; }
+  el.innerHTML=recs.map(r=>{
+    const t=teachers.find(t=>t.id===r.teacherId);
+    return `<div class="log-card">
+      <div class="log-card-ava ${r.type}">${t?initials(t.name):'?'}</div>
+      <div class="log-info">
+        <div class="log-name">${esc(t?t.name:'Unknown Teacher')}</div>
+        <div class="log-time">${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <span class="log-badge ${r.type}">${r.type.toUpperCase()}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADMIN AUTH
+// ═══════════════════════════════════════════════════════
+function requireAdmin() {
+  if (adminLoggedIn) { goPage('admin'); return; }
+  document.getElementById('login-screen').classList.add('show');
+  setTimeout(()=>document.getElementById('pin-input').focus(),100);
+}
+function doLogin() {
+  const pin=document.getElementById('pin-input').value;
+  if (pin===settings.pin) {
+    document.getElementById('login-screen').classList.remove('show');
+    document.getElementById('pin-input').value='';
+    document.getElementById('login-err').style.display='none';
+    adminLoggedIn=true; goPage('admin'); refreshAdminViews();
+  } else {
+    document.getElementById('login-err').style.display='block';
+    document.getElementById('pin-input').value='';
+  }
+}
+function closeLogin() { document.getElementById('login-screen').classList.remove('show'); document.getElementById('pin-input').value=''; }
+
+// ═══════════════════════════════════════════════════════
+//  ADMIN SECTIONS
+// ═══════════════════════════════════════════════════════
+function aNav(sec, btn) {
+  document.querySelectorAll('.a-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.a-section').forEach(s=>s.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById(`asec-${sec}`).classList.add('active');
+  if (sec==='teachers') renderTeachersList();
+  if (sec==='reports')  { populateRptFilter(); renderReport(); }
+  if (sec==='individual') populateIndSel();
+  if (sec==='overview') renderOverview();
+}
+
+function refreshAdminViews() {
+  renderOverview(); renderTeachersList(); populateRptFilter(); populateIndSel();
+  const active = document.querySelector('.a-section.active');
+  if (active?.id==='asec-reports') renderReport();
+  if (active?.id==='asec-individual') renderIndividual();
+}
+
+function renderOverview() {
+  const today=new Date().toDateString();
+  const todayIns=records.filter(r=>new Date(r.ts).toDateString()===today && r.type==='in');
+  const weekStart=new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay()); weekStart.setHours(0,0,0,0);
+  const weekIns=records.filter(r=>new Date(r.ts)>=weekStart && r.type==='in');
+  const nowIn=Object.keys(activeSessions).length;
+  document.getElementById('stat-teachers').textContent=teachers.length;
+  document.getElementById('stat-today').textContent=todayIns.length;
+  document.getElementById('stat-present').textContent=nowIn;
+  document.getElementById('stat-week').textContent=weekIns.length;
+
+  const recent=records.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,10);
+  const el=document.getElementById('admin-recent-log');
+  if (!recent.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet</div></div>'; return; }
+  el.innerHTML=recent.map(r=>{
+    const t=teachers.find(t=>t.id===r.teacherId);
+    return `<div class="log-card">
+      <div class="log-card-ava ${r.type}">${t?initials(t.name):'?'}</div>
+      <div class="log-info">
+        <div class="log-name">${esc(t?t.name:'Unknown')}</div>
+        <div class="log-time">${new Date(r.ts).toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})} · ${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <span class="log-badge ${r.type}">${r.type.toUpperCase()}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  TEACHER MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function toggleAddForm() {
+  const w=document.getElementById('add-form-wrap');
+  w.style.display=w.style.display==='none'?'block':'none';
+}
+
+async function addTeacher() {
+  const name=document.getElementById('new-name').value.trim();
+  const tsc=document.getElementById('new-tsc').value.trim();
+  if (!name) { showToast('⚠️ Name is required'); return; }
+  if (teachers.find(t=>t.name.toLowerCase()===name.toLowerCase())) { showToast('⚠️ Teacher already exists'); return; }
+  const t={id:uid(), name, tsc, addedAt:new Date().toISOString()};
+  teachers.push(t); saveLocal();
+  if (DB_MODE==='firebase') await fbAddTeacher(t);
+  document.getElementById('new-name').value=''; document.getElementById('new-tsc').value='';
+  toggleAddForm(); renderTeachersList(); renderTeacherDropdown('');
+  showToast(`✅ ${name} added`);
+}
+
+function renderTeachersList() {
+  const el=document.getElementById('teachers-list');
+  if (!teachers.length) { el.innerHTML='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">No teachers added yet</div></div>'; return; }
+  el.innerHTML=teachers.map(t=>`
+    <div class="teacher-item">
+      <div class="t-ava">${initials(t.name)}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="t-name">${esc(t.name)}</div>
+        <div class="t-meta">${t.tsc?t.tsc:'Not TSC registered'} · ${records.filter(r=>r.teacherId===t.id&&r.type==='in').length} sessions</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="openDelModal('${t.id}')">Delete</button>
+    </div>`).join('');
+}
+
+function openDelModal(id) {
+  pendingDeleteId=id;
+  const t=teachers.find(t=>t.id===id);
+  document.getElementById('del-modal-txt').textContent=`Delete "${t?.name}"? All their ${records.filter(r=>r.teacherId===id).length} records will also be deleted.`;
+  document.getElementById('del-modal').classList.add('open');
+}
+function closeDelModal() { document.getElementById('del-modal').classList.remove('open'); pendingDeleteId=null; }
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const t=teachers.find(t=>t.id===pendingDeleteId);
+  teachers=teachers.filter(t=>t.id!==pendingDeleteId);
+  records=records.filter(r=>r.teacherId!==pendingDeleteId);
+  delete activeSessions[pendingDeleteId];
+  saveLocal();
+  if (DB_MODE==='firebase') await fbDeleteTeacher(pendingDeleteId);
+  if (selectedTeacher?.id===pendingDeleteId) clearTeacher();
+  closeDelModal(); renderTeachersList(); renderTeacherDropdown('');
+  showToast(`🗑 ${t?.name} deleted`);
+}
+
+// ═══════════════════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════════════════
+function populateRptFilter() {
+  const sel=document.getElementById('rpt-teacher');
+  sel.innerHTML='<option value="all">All Teachers</option>'+teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+}
+
+function getFilteredRecs() {
+  const period=document.getElementById('rpt-period').value;
+  const tid=document.getElementById('rpt-teacher').value;
+  const now=new Date(); let start;
+  if (period==='daily') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  else if (period==='weekly') { start=new Date(now); start.setDate(now.getDate()-now.getDay()); start.setHours(0,0,0,0); }
+  else start=new Date(now.getFullYear(),now.getMonth(),1);
+  return records.filter(r=>{
+    if (new Date(r.ts)<start) return false;
+    if (tid!=='all'&&r.teacherId!==tid) return false;
+    return true;
+  }).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+}
+
+function buildRows(recs) {
+  const rows=[]; const map={};
+  recs.forEach(r=>{
+    const k=`${r.teacherId}_${new Date(r.ts).toDateString()}`;
+    if (!map[k]) map[k]=[];
+    map[k].push(r);
+  });
+  Object.values(map).forEach(dr=>{
+    const ins=dr.filter(r=>r.type==='in').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    const outs=dr.filter(r=>r.type==='out').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    const t=teachers.find(t=>t.id===dr[0].teacherId);
+    const n=Math.max(ins.length,outs.length);
+    for (let i=0;i<n;i++) {
+      const ir=ins[i],or=outs[i];
+      rows.push({name:t?t.name:'Unknown',tsc:t?.tsc||'',
+        date:new Date((ir||or).ts).toLocaleDateString('en-KE'),
+        in:ir?new Date(ir.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'}):'—',
+        out:or?new Date(or.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'}):'—',
+        dur:(ir&&or)?fmtMs(new Date(or.ts)-new Date(ir.ts)):'—'});
+    }
+  });
+  return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
+}
+
+function renderReport() {
+  const rows=buildRows(getFilteredRecs());
+  const body=document.getElementById('rpt-body'), empty=document.getElementById('rpt-empty');
+  if (!rows.length) { body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML=rows.map(r=>`<tr>
+    <td style="font-weight:700;white-space:nowrap">${esc(r.name)}</td>
+    <td>${r.tsc?`<span class="tsc-badge">${esc(r.tsc)}</span>`:'<span class="unr-badge">—</span>'}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap">${r.date}</td>
+    <td style="color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:11px;">${r.in}</td>
+    <td style="color:var(--rose);font-family:'JetBrains Mono',monospace;font-size:11px;">${r.out}</td>
+    <td style="font-family:'JetBrains Mono',monospace;font-size:11px;">${r.dur}</td>
+  </tr>`).join('');
+}
+
+function exportPDF() {
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const rows=buildRows(getFilteredRecs());
+  const period={'daily':'Daily','weekly':'Weekly','monthly':'Monthly'}[document.getElementById('rpt-period').value];
+  const W=297, H=210;
+  // White background
+  doc.setFillColor(255,255,255); doc.rect(0,0,W,H,'F');
+  // Teal header bar
+  doc.setFillColor(15,212,192); doc.rect(0,0,W,22,'F');
+  doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(11,17,32);
+  doc.text(settings.schoolName||'School Attendance', 14, 14);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`${period} Report · ${new Date().toLocaleString('en-KE')}`, 14, 20);
+  // Powered by — right side of header
+  doc.setFontSize(7); doc.setTextColor(30,50,40);
+  doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, 14, {align:'right'});
+  if (!rows.length) {
+    doc.setTextColor(100,100,100); doc.setFontSize(11);
+    doc.text('No records for the selected period.', 14, 40);
+  } else {
+    doc.autoTable({startY:27,
+      head:[['Teacher','TSC Number','Date','Clock In','Clock Out','Duration']],
+      body:rows.map(r=>[r.name,r.tsc||'—',r.date,r.in,r.out,r.dur]),
+      styles:{fontSize:9,cellPadding:3,textColor:[30,40,60],fillColor:[255,255,255]},
+      headStyles:{fillColor:[11,17,32],textColor:[15,212,192],fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[245,250,252]},
+      bodyStyles:{fillColor:[255,255,255],textColor:[30,40,60]},
+      footStyles:{fillColor:[240,250,248],textColor:[30,100,90]},
+      theme:'grid',
+      didDrawPage:(data)=>{
+        const pg=doc.internal.getCurrentPageInfo().pageNumber;
+        const total=doc.internal.getNumberOfPages();
+        doc.setFontSize(7); doc.setTextColor(150,150,150);
+        doc.text(`Page ${pg} of ${total} · EduTrack School Attendance`, W/2, H-5, {align:'center'});
+        doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, H-5, {align:'right'});
+      }
+    });
+  }
+  doc.save(`${(settings.schoolName||'attendance').replace(/\s+/g,'_')}_${period.toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast('📄 PDF exported');
+}
+
+// ═══════════════════════════════════════════════════════
+//  INDIVIDUAL STATS
+// ═══════════════════════════════════════════════════════
+function populateIndSel() {
+  const sel=document.getElementById('ind-sel');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Choose teacher —</option>'+teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  if (cur) sel.value=cur;
+}
+
+function renderIndividual() {
+  const id=document.getElementById('ind-sel').value;
+  const el=document.getElementById('ind-content');
+  if (!id) { el.innerHTML='<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Select a teacher</div></div>'; return; }
+  const t=teachers.find(t=>t.id===id);
+  const tRecs=records.filter(r=>r.teacherId===id);
+  const ins=tRecs.filter(r=>r.type==='in').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const outs=tRecs.filter(r=>r.type==='out').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const pairs=Math.min(ins.length,outs.length);
+  let totalMs=0;
+  for(let i=0;i<pairs;i++) totalMs+=new Date(outs[i].ts)-new Date(ins[i].ts);
+
+  const days=[];
+  for(let i=6;i>=0;i--) {
+    const d=new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+    const lbl=d.toLocaleDateString('en-KE',{weekday:'short',day:'numeric'});
+    const cnt=ins.filter(r=>{const rd=new Date(r.ts);rd.setHours(0,0,0,0);return rd.getTime()===d.getTime();}).length;
+    days.push({lbl,cnt});
+  }
+  const maxC=Math.max(...days.map(d=>d.cnt),1);
+
+  el.innerHTML=`
+    <div class="stats-row">
+      <div class="stat-pill"><div class="stat-num">${ins.length}</div><div class="stat-lbl">Check-ins</div></div>
+      <div class="stat-pill"><div class="stat-num">${pairs}</div><div class="stat-lbl">Full Sessions</div></div>
+      <div class="stat-pill"><div class="stat-num" style="font-size:18px;">${fmtMs(totalMs,true)}</div><div class="stat-lbl">Total Time</div></div>
+      <div class="stat-pill"><div class="stat-num" style="font-size:18px;">${pairs?fmtMs(totalMs/pairs,true):'—'}</div><div class="stat-lbl">Avg Session</div></div>
+    </div>
+    <div class="a-card" style="margin-bottom:16px;">
+      <div class="a-card-head"><span class="a-card-title">Last 7 Days</span></div>
+      <div class="a-card-body">
+        ${days.map(d=>`
+          <div class="ind-bar-row">
+            <div class="ind-bar-lbl">${d.lbl}</div>
+            <div class="ind-bar-wrap"><div class="ind-bar-fill" style="width:${(d.cnt/maxC)*100}%"></div></div>
+            <div class="ind-bar-count">${d.cnt}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-teal btn-sm" onclick="exportIndPDF('${id}')">⬇ Export Individual PDF</button>`;
+}
+
+function exportIndPDF(id) {
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  const t=teachers.find(t=>t.id===id);
+  const rows=buildRows(records.filter(r=>r.teacherId===id));
+  const W=210, H=297;
+  // White background
+  doc.setFillColor(255,255,255); doc.rect(0,0,W,H,'F');
+  // Teal header bar
+  doc.setFillColor(15,212,192); doc.rect(0,0,W,26,'F');
+  doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(11,17,32);
+  doc.text(settings.schoolName||'School Attendance', 14, 12);
+  doc.setFontSize(11); doc.setTextColor(20,60,50);
+  doc.text(t?.name||'Teacher Report', 14, 20);
+  // Powered by — right side
+  doc.setFontSize(7); doc.setTextColor(30,50,40);
+  doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, 12, {align:'right'});
+  let y=32;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,100,120);
+  if (t?.tsc) { doc.text(`TSC Number: ${t.tsc}`, 14, y); y+=6; }
+  doc.text(`Report generated: ${new Date().toLocaleString('en-KE')}`, 14, y); y+=8;
+  if (!rows.length) { doc.setTextColor(150,150,150); doc.text('No records found.', 14, y+10); }
+  else {
+    doc.autoTable({startY:y,
+      head:[['Date','Clock In','Clock Out','Duration']],
+      body:rows.map(r=>[r.date,r.in,r.out,r.dur]),
+      styles:{fontSize:9,cellPadding:3,textColor:[30,40,60],fillColor:[255,255,255]},
+      headStyles:{fillColor:[11,17,32],textColor:[15,212,192],fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[245,250,252]},
+      bodyStyles:{fillColor:[255,255,255],textColor:[30,40,60]},
+      theme:'grid',
+      didDrawPage:(data)=>{
+        const pg=doc.internal.getCurrentPageInfo().pageNumber;
+        const total=doc.internal.getNumberOfPages();
+        doc.setFontSize(7); doc.setTextColor(150,150,150);
+        doc.text(`${t?.name} · Page ${pg} of ${total}`, W/2, H-8, {align:'center'});
+        doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, H-8, {align:'right'});
+      }
+    });
+  }
+  doc.save(`${t?.name?.replace(/\s+/g,'_')}_attendance_${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast('📄 Individual PDF exported');
+}
+
+// ═══════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════
+function goPage(p) {
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.bn-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`page-${p}`).classList.add('active');
+  document.getElementById(`bn-${p}`).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function haversine(a,b) {
+  const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
+  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function initials(n) { return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtSec(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60; return `${pad(h)}:${pad(m)}:${pad(sc)}`; }
+function pad(n) { return String(n).padStart(2,'0'); }
+function fmtMs(ms,short=false) { const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return short?(h>0?`${h}h ${m}m`:`${m}m`):(h>0?`${h}h ${m}m`:m>0?`${m}m ${s%60}s`:`${s%60}s`); }
+function updateClock() { document.getElementById('h-clock').textContent=new Date().toLocaleTimeString('en-KE',{hour12:false}); }
+function updateSyncDot() { document.getElementById('sync-dot').className=DB_MODE==='firebase'&&window._firebase?.firebaseReady?'sync-dot':'sync-dot offline'; }
+function showOfflineBanner(show) { document.getElementById('offline-bar').classList.toggle('show',show); }
+
+let toastT;
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// updateSyncDot is called from launchApp
+
+// ═══════════════════════════════════════════════════════
+//  PWA — Manifest + Service Worker
+// ═══════════════════════════════════════════════════════
+(function setupPWA() {
+  // Inline manifest injected as blob URL
+  const manifest = {
+    name: "EduTrack School Attendance",
+    short_name: "EduTrack",
+    description: "Geofenced school attendance system",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#0b1120",
+    theme_color: "#0fd4c0",
+    orientation: "portrait-primary",
+    icons: [
+      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%230fd4c0'/><text y='400' x='60' font-size='380'>🏫</text></svg>", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='30' fill='%230fd4c0'/><text y='150' x='22' font-size='140'>🏫</text></svg>", sizes: "192x192", type: "image/svg+xml" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  document.getElementById('pwa-manifest').href = url;
+
+  // Register service worker inline via blob
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'edutrack-v1';
+const ASSETS = ['./'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match('./')));
+  } else {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  }
+});`;
+    const swBlob = new Blob([swCode], {type: 'application/javascript'});
+    const swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, {scope: '/'})
+      .then(() => console.log('EduTrack SW registered'))
+      .catch(e => console.warn('SW registration failed:', e));
+  }
+
+  // iOS install prompt hint (shown once)
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone;
+  if (isIOS && !isStandalone && !localStorage.getItem('ios-hint-shown')) {
+    setTimeout(() => {
+      showToast('📲 Tip: Tap Share → Add to Home Screen to install');
+      localStorage.setItem('ios-hint-shown', '1');
+    }, 4000);
+  }
+})();
+</script>
+</body>
+</html>
