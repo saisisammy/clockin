@@ -10,6 +10,13 @@
 <meta name="theme-color" content="#0b1120">
 <meta name="description" content="School Attendance System with Geofencing">
 <link rel="manifest" id="pwa-manifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EduTrack">
+<meta name="application-name" content="EduTrack">
+<meta name="theme-color" content="#0fd4c0">
+<meta name="msapplication-TileColor" content="#0fd4c0">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230fd4c0'/><text y='.9em' font-size='80' x='10'>🏫</text></svg>">
 <title>EduTrack · School Attendance</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -320,6 +327,53 @@ header {
 .chip-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-tsc { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
 .chip-clear { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+
+/* Remember Me toggle */
+.remember-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-md); margin-bottom: 12px;
+  cursor: pointer; transition: border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.remember-row:hover { border-color: var(--teal); }
+.remember-row-text { font-size: 13px; color: var(--text2); font-weight: 600; }
+.remember-row-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.toggle-switch {
+  width: 42px; height: 24px; border-radius: 12px; flex-shrink: 0;
+  background: var(--border2); position: relative; transition: background 0.25s;
+}
+.toggle-switch.on { background: var(--teal); }
+.toggle-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: transform 0.25s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.toggle-switch.on .toggle-knob { transform: translateX(18px); }
+
+/* Remembered-name banner */
+.remembered-banner {
+  display: none; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(15,212,192,0.1), rgba(56,189,248,0.07));
+  border: 1px solid rgba(15,212,192,0.25);
+  border-radius: var(--r-md); margin-bottom: 10px;
+  animation: fadeUp 0.3s ease;
+}
+.remembered-banner.show { display: flex; }
+.rb-ava {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--teal), var(--sky));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #0b1120;
+}
+.rb-info { flex: 1; min-width: 0; }
+.rb-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rb-hint { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.rb-change { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text3); font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.rb-change:hover { border-color: var(--teal); color: var(--teal); }
 
 .search-wrap { position: relative; margin-bottom: 4px; }
 .search-input {
@@ -636,6 +690,8 @@ header {
 .attribution span { color: var(--teal); font-weight: 700; }
 
 /* PWA install banner */
+/* iOS install sheet uses .modal-bg / .modal-box styles already defined */
+
 .pwa-banner {
   display: none;
   position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 300;
@@ -727,6 +783,17 @@ header {
   <div class="picker-card">
     <div class="picker-label">👤 Select Your Name</div>
 
+    <!-- Remembered teacher banner (shown when remember-me is on) -->
+    <div class="remembered-banner" id="remembered-banner">
+      <div class="rb-ava" id="rb-ava">?</div>
+      <div class="rb-info">
+        <div class="rb-name" id="rb-name">—</div>
+        <div class="rb-hint">Remembered on this device</div>
+      </div>
+      <button class="rb-change" onclick="promptColleague()">Switch</button>
+    </div>
+
+    <!-- Selected teacher chip -->
     <div class="selected-chip" id="sel-chip">
       <div class="chip-ava" id="sel-chip-ava">?</div>
       <div class="chip-info">
@@ -736,11 +803,23 @@ header {
       <button class="chip-clear" onclick="clearTeacher()">✕</button>
     </div>
 
+    <!-- Search/select -->
     <div class="search-wrap" id="search-wrap">
       <span class="search-icon">🔍</span>
       <input type="text" class="search-input" id="t-search" placeholder="Search your name…"
         autocomplete="off" oninput="filterTeachers(this.value)" onfocus="openDD()" onblur="schedClose()">
       <div class="t-dropdown" id="t-dropdown"></div>
+    </div>
+
+    <!-- Remember Me toggle -->
+    <div class="remember-row" id="remember-row" onclick="toggleRememberMe()" style="display:none;">
+      <div>
+        <div class="remember-row-text">Remember me on this device</div>
+        <div class="remember-row-sub">Auto-select your name next time</div>
+      </div>
+      <div class="toggle-switch" id="remember-toggle">
+        <div class="toggle-knob"></div>
+      </div>
     </div>
 
     <div class="clock-btns">
@@ -970,6 +1049,22 @@ header {
   </div>
 </div>
 
+<!-- Colleague confirmation modal -->
+<div class="modal-bg" id="colleague-modal">
+  <div class="modal-box">
+    <div style="font-size:36px;text-align:center;margin-bottom:12px;">👥</div>
+    <div class="modal-title" style="text-align:center;">Clocking for a Colleague?</div>
+    <div class="modal-text" style="text-align:center;" id="colleague-modal-text">
+      You are already remembered on this device.<br>Are you clocking in/out for yourself or a colleague?
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-teal" onclick="colleagueSelf()" style="width:100%;">🙋 It's me — switch to my name</button>
+      <button class="btn btn-ghost" onclick="colleagueColleague()" style="width:100%;">👤 Clocking for a colleague</button>
+      <button class="btn btn-ghost" onclick="closeColleagueModal()" style="width:100%;color:var(--text3);font-size:12px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Device limit modal -->
 <div class="modal-bg" id="device-limit-modal">
   <div class="modal-box">
@@ -987,16 +1082,38 @@ header {
 
 <div class="toast" id="toast"></div>
 
-<!-- PWA Install Banner -->
+<!-- PWA Install Banner (Android/Chrome) -->
 <div class="pwa-banner" id="pwa-banner">
   <div class="pwa-banner-icon">🏫</div>
   <div class="pwa-banner-text">
     <div class="pwa-banner-title">Install EduTrack</div>
-    <div class="pwa-banner-sub">Add to home screen for quick access</div>
+    <div class="pwa-banner-sub">Add to home screen — works offline</div>
   </div>
   <div class="pwa-banner-btns">
-    <button class="btn btn-teal btn-sm" id="pwa-install-btn">Install</button>
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pwa-banner').classList.remove('show')">✕</button>
+    <button class="btn btn-teal btn-sm" id="pwa-install-btn">📲 Install</button>
+    <button class="btn btn-ghost btn-sm" onclick="hideInstallBanner()">✕</button>
+  </div>
+</div>
+
+<!-- iOS Install Instructions Sheet -->
+<div class="modal-bg" id="ios-install-sheet">
+  <div class="modal-box" style="max-width:340px;">
+    <div style="text-align:center;font-size:40px;margin-bottom:12px;">📲</div>
+    <div class="modal-title" style="text-align:center;margin-bottom:8px;">Install EduTrack</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.9;margin-bottom:20px;">
+      To install on your iPhone or iPad:<br>
+      <span style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+        <span style="font-size:20px;">1️⃣</span> Tap the <strong style="color:var(--teal)">Share</strong> button
+        <span style="font-size:18px;">⬆️</span> at the bottom of Safari
+      </span>
+      <span style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <span style="font-size:20px;">2️⃣</span> Scroll down and tap <strong style="color:var(--teal)">Add to Home Screen</strong>
+      </span>
+      <span style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <span style="font-size:20px;">3️⃣</span> Tap <strong style="color:var(--teal)">Add</strong> — done! 🎉
+      </span>
+    </div>
+    <button class="btn btn-teal btn-full" onclick="closeIOSSheet()">Got it</button>
   </div>
 </div>
 
@@ -1055,6 +1172,8 @@ function launchApp() {
   startGPS();
   renderTodayLog();
   renderTeacherDropdown('');
+  // Restore remembered teacher after teachers list is ready
+  setTimeout(restoreRememberedTeacher, 300);
   setInterval(updateClock, 1000);
   updateClock();
   document.getElementById('today-lbl').textContent = new Date().toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'});
@@ -1149,6 +1268,8 @@ function listenFirebase() {
     teachers = snap.docs.map(d => ({id:d.id,...d.data()}));
     renderTeacherDropdown('');
     if (adminLoggedIn) refreshAdminViews();
+    // Re-restore remembered teacher in case it loaded after initial render
+    if (!selectedTeacher) restoreRememberedTeacher();
   });
 
   // Sessions
@@ -1397,28 +1518,146 @@ function openDD() { document.getElementById('t-dropdown').classList.add('open');
 let closeT;
 function schedClose() { closeT=setTimeout(()=>document.getElementById('t-dropdown').classList.remove('open'),200); }
 
+// ── Remember Me state ──
+let rememberMeOn = localStorage.getItem('et_remember_me') === '1';
+let rememberedId  = localStorage.getItem('et_remembered_id') || null;
+// Flag: true when user is selecting a colleague (bypasses remembered name)
+let selectingColleague = false;
+
 function selectTeacher(id) {
   clearTimeout(closeT);
   const t = teachers.find(t=>t.id===id);
   if (!t) return;
+
   selectedTeacher = t;
   document.getElementById('t-dropdown').classList.remove('open');
-  document.getElementById('t-search').value='';
-  document.getElementById('sel-chip-ava').textContent = initials(t.name);
+  document.getElementById('t-search').value = '';
+
+  // Show selected chip, hide search
+  document.getElementById('sel-chip-ava').textContent  = initials(t.name);
   document.getElementById('sel-chip-name').textContent = t.name;
-  document.getElementById('sel-chip-tsc').textContent = t.tsc ? `TSC: ${t.tsc}` : 'Not TSC registered';
+  document.getElementById('sel-chip-tsc').textContent  = t.tsc ? `TSC: ${t.tsc}` : 'Not TSC registered';
   document.getElementById('sel-chip').classList.add('visible');
-  document.getElementById('search-wrap').style.display='none';
+  document.getElementById('search-wrap').style.display = 'none';
+
+  // Show remember-me toggle whenever a teacher is selected
+  document.getElementById('remember-row').style.display = 'flex';
+
+  // Sync toggle state
+  const tog = document.getElementById('remember-toggle');
+  if (rememberMeOn) tog.classList.add('on'); else tog.classList.remove('on');
+
+  // If remember-me is on, persist this selection
+  if (rememberMeOn) {
+    rememberedId = t.id;
+    localStorage.setItem('et_remembered_id', t.id);
+    // Show remembered banner, hide chip (cleaner UX)
+    showRememberedBanner(t);
+    document.getElementById('sel-chip').classList.remove('visible');
+  }
+
+  selectingColleague = false;
   updateClockButtons(); drawMap();
   if (activeSessions[t.id]) startSessionTimer(t);
   else stopSessionTimer();
 }
 
 function clearTeacher() {
-  selectedTeacher=null;
+  selectedTeacher = null;
   document.getElementById('sel-chip').classList.remove('visible');
-  document.getElementById('search-wrap').style.display='block';
+  document.getElementById('search-wrap').style.display = 'block';
+  document.getElementById('remember-row').style.display = 'none';
+  document.getElementById('remembered-banner').classList.remove('show');
   stopSessionTimer(); updateClockButtons(); drawMap();
+}
+
+// ── Remember Me toggle ──
+function toggleRememberMe() {
+  rememberMeOn = !rememberMeOn;
+  localStorage.setItem('et_remember_me', rememberMeOn ? '1' : '0');
+  const tog = document.getElementById('remember-toggle');
+  tog.classList.toggle('on', rememberMeOn);
+
+  if (rememberMeOn && selectedTeacher) {
+    rememberedId = selectedTeacher.id;
+    localStorage.setItem('et_remembered_id', selectedTeacher.id);
+    showRememberedBanner(selectedTeacher);
+    document.getElementById('sel-chip').classList.remove('visible');
+    showToast('✅ ' + selectedTeacher.name + ' will be remembered on this device');
+  } else {
+    rememberedId = null;
+    localStorage.removeItem('et_remembered_id');
+    document.getElementById('remembered-banner').classList.remove('show');
+    if (selectedTeacher) {
+      document.getElementById('sel-chip').classList.add('visible');
+    }
+    showToast('👋 Remember me turned off');
+  }
+}
+
+// ── Show the remembered banner ──
+function showRememberedBanner(t) {
+  document.getElementById('rb-ava').textContent  = initials(t.name);
+  document.getElementById('rb-name').textContent = t.name;
+  document.getElementById('remembered-banner').classList.add('show');
+}
+
+// ── Restore remembered teacher on app load ──
+function restoreRememberedTeacher() {
+  if (!rememberMeOn || !rememberedId) return;
+  const t = teachers.find(t => t.id === rememberedId);
+  if (!t) return;
+
+  selectedTeacher = t;
+  showRememberedBanner(t);
+  document.getElementById('search-wrap').style.display = 'none';
+  document.getElementById('remember-row').style.display = 'flex';
+  document.getElementById('remember-toggle').classList.add('on');
+  updateClockButtons(); drawMap();
+  if (activeSessions[t.id]) startSessionTimer(t);
+}
+
+// ── "Switch" button on remembered banner — ask if colleague ──
+function promptColleague() {
+  const remT = teachers.find(t => t.id === rememberedId);
+  const txt = document.getElementById('colleague-modal-text');
+  txt.innerHTML = remT
+    ? `You are remembered as <strong style="color:var(--teal)">${esc(remT.name)}</strong>.<br>Are you switching to your own name or clocking for a colleague?`
+    : `Are you clocking in/out for yourself or a colleague?`;
+  document.getElementById('colleague-modal').classList.add('open');
+}
+
+// User confirms it's themselves — show search to re-select their name
+function colleagueSelf() {
+  closeColleagueModal();
+  // Clear current selection and show search so they can find themselves
+  selectedTeacher = null;
+  document.getElementById('remembered-banner').classList.remove('show');
+  document.getElementById('sel-chip').classList.remove('visible');
+  document.getElementById('search-wrap').style.display = 'block';
+  document.getElementById('remember-row').style.display = 'none';
+  selectingColleague = false;
+  stopSessionTimer(); updateClockButtons(); drawMap();
+  setTimeout(() => document.getElementById('t-search').focus(), 150);
+}
+
+// User wants to clock for a colleague — show search, disable remember-me for this selection
+function colleagueColleague() {
+  closeColleagueModal();
+  selectingColleague = true;
+  // Temporarily show chip/search without changing remembered name
+  document.getElementById('remembered-banner').classList.remove('show');
+  document.getElementById('sel-chip').classList.remove('visible');
+  document.getElementById('search-wrap').style.display = 'block';
+  // Change picker label to make intent clear
+  document.querySelector('.picker-label').textContent = "👥 Select Colleague's Name";
+  selectedTeacher = null;
+  stopSessionTimer(); updateClockButtons(); drawMap();
+  setTimeout(() => document.getElementById('t-search').focus(), 150);
+}
+
+function closeColleagueModal() {
+  document.getElementById('colleague-modal').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1948,62 +2187,184 @@ function showToast(msg) {
 // updateSyncDot is called from launchApp
 
 // ═══════════════════════════════════════════════════════
-//  PWA — Manifest + Service Worker
+//  PWA — Manifest + Service Worker + Install Prompt
 // ═══════════════════════════════════════════════════════
 (function setupPWA() {
-  // Inline manifest injected as blob URL
+
+  // ── 1. Inject Web App Manifest as blob ──
   const manifest = {
     name: "EduTrack School Attendance",
     short_name: "EduTrack",
-    description: "Geofenced school attendance system",
-    start_url: "./",
+    description: "Geofenced school attendance system for teachers",
+    start_url: location.href,   // exact URL so install works from any host
     display: "standalone",
     background_color: "#0b1120",
     theme_color: "#0fd4c0",
     orientation: "portrait-primary",
+    categories: ["education", "productivity"],
     icons: [
-      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%230fd4c0'/><text y='400' x='60' font-size='380'>🏫</text></svg>", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
-      { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='30' fill='%230fd4c0'/><text y='150' x='22' font-size='140'>🏫</text></svg>", sizes: "192x192", type: "image/svg+xml" }
+      {
+        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF8WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNi4wLWMwMDMgNzkuMTY0NTI3LCAyMDIwLzEwLzE1LTE3OjQ4OjMyICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdFJlZj0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlUmVmIyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjIuMSAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NkFBNUM4RjhENEMyMTFFQjkzMDhGOEIxNjlCNTA2MDMiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NkFBNUM4RjlENEMyMTFFQjkzMDhGOEIxNjlCNTA2MDMiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo2QUE1QzhGNkQ0QzIxMUVCOTMwOEY4QjE2OUI1MDYwMyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo2QUE1QzhGN0Q0QzIxMUVCOTMwOEY4QjE2OUI1MDYwMyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pn3R3i8AABC9SURBVHja",
+        sizes: "192x192",
+        type: "image/png"
+      }
     ]
   };
-  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  document.getElementById('pwa-manifest').href = url;
 
-  // Register service worker inline via blob
+  // Build proper PNG icons using canvas for best compatibility
+  function makeIconDataURL(size) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    // Background
+    const r = size * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(size-r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size-r);
+    ctx.quadraticCurveTo(size, size, size-r, size);
+    ctx.lineTo(r, size);
+    ctx.quadraticCurveTo(0, size, 0, size-r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, '#0fd4c0');
+    grad.addColorStop(1, '#38bdf8');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // Emoji
+    ctx.font = `${size * 0.55}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🏫', size / 2, size / 2 + size * 0.04);
+    return c.toDataURL('image/png');
+  }
+
+  manifest.icons = [
+    { src: makeIconDataURL(192), sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: makeIconDataURL(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+  ];
+
+  const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  const mUrl  = URL.createObjectURL(mBlob);
+  const mLink = document.getElementById('pwa-manifest');
+  if (mLink) mLink.href = mUrl;
+
+  // ── 2. Service Worker — registered via blob with same-origin header trick ──
   if ('serviceWorker' in navigator) {
-    const swCode = `
-const CACHE = 'edutrack-v1';
-const ASSETS = ['./'];
+    const CACHE = 'edutrack-v3';
+    const sw = `
+const CACHE = '${CACHE}';
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(c =>
+      c.addAll([self.location.href.replace(/\/sw.*$/, '/')])
+        .catch(() => {})   // non-fatal if page isn't cacheable
+    )
+  );
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 self.addEventListener('fetch', e => {
-  if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match('./')));
-  } else {
-    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-  }
+  // Only handle same-origin GET requests
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });`;
-    const swBlob = new Blob([swCode], {type: 'application/javascript'});
-    const swUrl = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, {scope: '/'})
-      .then(() => console.log('EduTrack SW registered'))
-      .catch(e => console.warn('SW registration failed:', e));
+
+    const swBlob = new Blob([sw], { type: 'application/javascript' });
+    const swUrl  = URL.createObjectURL(swBlob);
+
+    navigator.serviceWorker.register(swUrl)
+      .then(reg => {
+        console.log('✅ EduTrack SW registered, scope:', reg.scope);
+      })
+      .catch(err => {
+        console.warn('SW registration failed (expected when opened as local file):', err.message);
+      });
   }
 
-  // iOS install prompt hint (shown once)
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone;
-  if (isIOS && !isStandalone && !localStorage.getItem('ios-hint-shown')) {
-    setTimeout(() => {
-      showToast('📲 Tip: Tap Share → Add to Home Screen to install');
-      localStorage.setItem('ios-hint-shown', '1');
-    }, 4000);
+  // ── 3. Android/Chrome — capture beforeinstallprompt ──
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show our custom install banner after a short delay
+    setTimeout(() => showInstallBanner(), 1500);
+  });
+
+  // Hide banner after successful install
+  window.addEventListener('appinstalled', () => {
+    hideInstallBanner();
+    showToast('🎉 EduTrack installed successfully!');
+    deferredPrompt = null;
+    localStorage.setItem('pwa-installed', '1');
+  });
+
+  // Wire up Install button
+  const installBtn = document.getElementById('pwa-install-btn');
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          showToast('⏳ Installing EduTrack…');
+        } else {
+          showToast('👍 You can install later from the browser menu');
+        }
+        deferredPrompt = null;
+        hideInstallBanner();
+      }
+    });
   }
+
+  // ── 4. iOS Safari — show manual instructions once ──
+  const isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                       window.navigator.standalone === true;
+  const alreadyInstalled = localStorage.getItem('pwa-installed');
+
+  if (isIOS && !isStandalone && !alreadyInstalled && !localStorage.getItem('ios-hint-shown')) {
+    setTimeout(() => showIOSInstallSheet(), 2500);
+  }
+
+  // ── Helpers ──
+  function showInstallBanner() {
+    if (localStorage.getItem('pwa-installed')) return;
+    const b = document.getElementById('pwa-banner');
+    if (b) b.classList.add('show');
+  }
+
+  function hideInstallBanner() {
+    const b = document.getElementById('pwa-banner');
+    if (b) b.classList.remove('show');
+  }
+
+  function showIOSInstallSheet() {
+    document.getElementById('ios-install-sheet').classList.add('open');
+    localStorage.setItem('ios-hint-shown', '1');
+  }
+
+  // Expose for close button
+  window.hideInstallBanner = hideInstallBanner;
+  window.closeIOSSheet = () => document.getElementById('ios-install-sheet').classList.remove('open');
+
 })();
 </script>
 </body>
