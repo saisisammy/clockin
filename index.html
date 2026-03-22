@@ -156,6 +156,14 @@ body::before {
   max-width: 280px; line-height: 1.6; display: none;
   animation: fadeUp 0.3s ease both;
 }
+.splash-attr {
+  position: absolute; bottom: 28px; left: 0; right: 0;
+  text-align: center;
+  font-size: 12px; color: var(--text3);
+  animation: fadeUp 0.4s 0.5s ease both;
+  letter-spacing: 0.02em;
+}
+.splash-attr strong { color: var(--teal); font-weight: 700; }
 
 /* ── HEADER ── */
 header {
@@ -673,6 +681,7 @@ header {
   <div class="splash-sub">School Attendance System</div>
   <div class="splash-spinner" id="splash-spinner"></div>
   <div class="splash-err" id="splash-err"></div>
+  <div class="splash-attr">Powered by <strong>Mr. Saisi Nyongesa Sammy</strong></div>
 </div>
 
 <!-- ══ OFFLINE BANNER ══ -->
@@ -858,7 +867,8 @@ header {
 
   <!-- SETTINGS -->
   <div class="a-section" id="asec-settings">
-    <div class="a-card">
+    <!-- School Configuration -->
+    <div class="a-card" style="margin-bottom:16px;">
       <div class="a-card-head"><span class="a-card-title">⚙️ School Configuration</span></div>
       <div class="a-card-body">
         <div class="f-row">
@@ -879,14 +889,43 @@ header {
           <label class="f-label">Geofence Radius (meters)</label>
           <input type="number" class="f-input" id="s-radius" value="300" min="50" max="2000">
         </div>
-        <div class="f-row">
-          <label class="f-label">Admin PIN (min 4 digits)</label>
-          <input type="password" class="f-input" id="s-pin" placeholder="••••" maxlength="8">
-        </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-teal" onclick="saveSettings()">💾 Save Settings</button>
+          <button class="btn btn-teal" id="save-settings-btn" onclick="saveSettings()">💾 Save Settings</button>
           <button class="btn btn-ghost" onclick="useMyLocation()">📍 Use My GPS Location</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Change Admin Password -->
+    <div class="a-card">
+      <div class="a-card-head"><span class="a-card-title">🔐 Change Admin Password</span></div>
+      <div class="a-card-body">
+        <div class="f-row">
+          <label class="f-label">Current Password</label>
+          <div style="position:relative;">
+            <input type="password" class="f-input" id="pin-current" placeholder="Enter current PIN" maxlength="8"
+              style="padding-right:44px;">
+            <button onclick="togglePinVis('pin-current',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
+          </div>
+        </div>
+        <div class="f-row">
+          <label class="f-label">New Password (min 4 digits)</label>
+          <div style="position:relative;">
+            <input type="password" class="f-input" id="pin-new" placeholder="New PIN" maxlength="8"
+              style="padding-right:44px;">
+            <button onclick="togglePinVis('pin-new',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
+          </div>
+        </div>
+        <div class="f-row">
+          <label class="f-label">Confirm New Password</label>
+          <div style="position:relative;">
+            <input type="password" class="f-input" id="pin-confirm" placeholder="Repeat new PIN" maxlength="8"
+              style="padding-right:44px;">
+            <button onclick="togglePinVis('pin-confirm',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
+          </div>
+        </div>
+        <div id="pin-change-err" style="font-size:12px;color:var(--rose);margin-bottom:10px;display:none;"></div>
+        <button class="btn btn-teal" onclick="changeAdminPin()">🔑 Update Password</button>
       </div>
     </div>
   </div>
@@ -927,6 +966,21 @@ header {
     <div class="modal-btns">
       <button class="btn btn-ghost btn-sm" onclick="closeDelModal()">Cancel</button>
       <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Device limit modal -->
+<div class="modal-bg" id="device-limit-modal">
+  <div class="modal-box">
+    <div style="font-size:36px;text-align:center;margin-bottom:12px;">⛔</div>
+    <div class="modal-title" style="text-align:center;">Device Limit Reached</div>
+    <div class="modal-text" style="text-align:center;">
+      This device has already been used to clock in <strong>2 teachers</strong> today.<br><br>
+      Each device is limited to a maximum of 2 teachers per day to prevent misuse.
+    </div>
+    <div class="modal-btns" style="justify-content:center;">
+      <button class="btn btn-teal btn-sm" onclick="document.getElementById('device-limit-modal').classList.remove('open')">Understood</button>
     </div>
   </div>
 </div>
@@ -1064,7 +1118,23 @@ async function loadFromFirebase() {
 
 function listenFirebase() {
   if (!fb?.db) return;
-  const { db, collection, onSnapshot, orderBy, query } = fb;
+  const { db, doc, collection, onSnapshot, orderBy, query } = fb;
+
+  // Listen to settings in real time
+  onSnapshot(doc(db,'school','settings'), snap => {
+    if (snap.exists()) {
+      const data = snap.data();
+      // Explicitly parse lat/lng as numbers to guard against Firestore type quirks
+      if (data.lat  !== undefined) data.lat  = parseFloat(data.lat);
+      if (data.lng  !== undefined) data.lng  = parseFloat(data.lng);
+      if (data.radius !== undefined) data.radius = parseInt(data.radius);
+      settings = { ...settings, ...data };
+      saveLocal();
+      applySettings();   // applySettings already guards against overwriting focused fields
+      drawMap();
+      updateClockButtons();
+    }
+  });
 
   // Listen to records in real time
   onSnapshot(collection(db,'records'), snap => {
@@ -1092,7 +1162,15 @@ function listenFirebase() {
 async function fbSaveSettings() {
   if (!fb?.db) return;
   const { db, doc, setDoc } = fb;
-  await setDoc(doc(db,'school','settings'), settings);
+  // Ensure lat/lng are stored as proper JS Numbers, not strings
+  const payload = {
+    ...settings,
+    lat:    settings.lat    != null ? Number(settings.lat)    : null,
+    lng:    settings.lng    != null ? Number(settings.lng)    : null,
+    radius: settings.radius != null ? Number(settings.radius) : 300,
+  };
+  // merge:true means we only update fields we send, never wipe others
+  await setDoc(doc(db,'school','settings'), payload, { merge: true });
 }
 
 async function fbAddTeacher(t) {
@@ -1128,10 +1206,17 @@ async function fbSetSession(teacherId, ts) {
 // ═══════════════════════════════════════════════════════
 function applySettings() {
   document.getElementById('h-school-name').textContent = settings.schoolName || 'No school set';
-  document.getElementById('s-name').value   = settings.schoolName || '';
-  document.getElementById('s-lat').value    = settings.lat  || '';
-  document.getElementById('s-lng').value    = settings.lng  || '';
-  document.getElementById('s-radius').value = settings.radius || 300;
+  // Only update form fields when admin section is NOT actively focused
+  // (avoids overwriting while user is typing)
+  const active = document.activeElement;
+  const editingSettings = active && ['s-name','s-lat','s-lng','s-radius'].includes(active.id);
+  if (!editingSettings) {
+    document.getElementById('s-name').value   = settings.schoolName || '';
+    // Use != null check so lat/lng of 0.0 don't become empty string
+    document.getElementById('s-lat').value    = settings.lat  != null ? settings.lat  : '';
+    document.getElementById('s-lng').value    = settings.lng  != null ? settings.lng  : '';
+    document.getElementById('s-radius').value = settings.radius || 300;
+  }
 }
 
 async function saveSettings() {
@@ -1139,14 +1224,32 @@ async function saveSettings() {
   const lat  = parseFloat(document.getElementById('s-lat').value);
   const lng  = parseFloat(document.getElementById('s-lng').value);
   const rad  = parseInt(document.getElementById('s-radius').value) || 300;
-  const pin  = document.getElementById('s-pin').value.trim();
+
   if (!name) { showToast('⚠️ School name required'); return; }
-  if (isNaN(lat)||isNaN(lng)) { showToast('⚠️ Valid coordinates required'); return; }
-  settings = {...settings, schoolName:name, lat, lng, radius:rad, ...(pin.length>=4?{pin}:{}) };
+  if (isNaN(lat) || isNaN(lng)) { showToast('⚠️ Valid coordinates required'); return; }
+  if (rad < 50 || rad > 2000) { showToast('⚠️ Radius must be between 50–2000 m'); return; }
+
+  // PIN is managed separately via changeAdminPin — don't touch it here
+  settings = { ...settings, schoolName: name, lat, lng, radius: rad };
   saveLocal();
-  if (DB_MODE==='firebase') await fbSaveSettings();
-  applySettings(); drawMap(); updateClockButtons();
-  showToast('✅ Settings saved & synced');
+
+  // Visual feedback on button
+  const saveBtn = document.getElementById('save-settings-btn');
+  if (saveBtn) { saveBtn.textContent = '⏳ Saving…'; saveBtn.disabled = true; }
+
+  try {
+    if (DB_MODE === 'firebase') await fbSaveSettings();
+    applySettings();
+    drawMap();
+    updateClockButtons();
+    showToast('✅ Settings saved & synced to cloud');
+  } catch (e) {
+    console.error('Save settings error:', e);
+    applySettings(); drawMap(); updateClockButtons();
+    showToast('⚠️ Saved locally — cloud sync failed');
+  } finally {
+    if (saveBtn) { saveBtn.textContent = '💾 Save Settings'; saveBtn.disabled = false; }
+  }
 }
 
 function useMyLocation() {
@@ -1347,8 +1450,26 @@ function updateClockButtons() {
 async function doClockIn() {
   const t=selectedTeacher;
   if (!t||activeSessions[t.id]) return;
+
+  // ── Device limit: max 2 teachers per device per day ──
+  const deviceId = getDeviceId();
+  const today = new Date().toDateString();
+  const todayDeviceIns = records.filter(r =>
+    r.type==='in' &&
+    r.deviceId===deviceId &&
+    new Date(r.ts).toDateString()===today
+  );
+  // Count unique teachers clocked in from this device today
+  const uniqueTeachersFromDevice = new Set(todayDeviceIns.map(r=>r.teacherId));
+  // If this teacher is new to this device today and limit is reached
+  if (!uniqueTeachersFromDevice.has(t.id) && uniqueTeachersFromDevice.size >= 2) {
+    showToast('⛔ This device has already clocked in 2 teachers today');
+    showDeviceLimitModal();
+    return;
+  }
+
   const now=new Date();
-  const rec={id:uid(),teacherId:t.id,type:'in',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng};
+  const rec={id:uid(),teacherId:t.id,type:'in',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng,deviceId};
   records.push(rec); activeSessions[t.id]=now.toISOString();
   saveLocal();
   if (DB_MODE==='firebase') { await fbAddRecord(rec); await fbSetSession(t.id,now.toISOString()); }
@@ -1741,6 +1862,63 @@ function goPage(p) {
   document.querySelectorAll('.bn-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`page-${p}`).classList.add('active');
   document.getElementById(`bn-${p}`).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  DEVICE ID + LIMIT MODAL
+// ═══════════════════════════════════════════════════════
+function getDeviceId() {
+  let id = localStorage.getItem('et_device_id');
+  if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,12); localStorage.setItem('et_device_id', id); }
+  return id;
+}
+
+function showDeviceLimitModal() {
+  document.getElementById('device-limit-modal').classList.add('open');
+}
+
+// ── Change Admin PIN ──
+function togglePinVis(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type==='password') { inp.type='text'; btn.textContent='🙈'; }
+  else { inp.type='password'; btn.textContent='👁'; }
+}
+
+async function changeAdminPin() {
+  const current  = document.getElementById('pin-current').value.trim();
+  const newPin   = document.getElementById('pin-new').value.trim();
+  const confirm  = document.getElementById('pin-confirm').value.trim();
+  const errEl    = document.getElementById('pin-change-err');
+
+  errEl.style.display = 'none';
+
+  if (current !== settings.pin) {
+    errEl.textContent = '❌ Current password is incorrect.';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPin.length < 4) {
+    errEl.textContent = '❌ New password must be at least 4 characters.';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPin !== confirm) {
+    errEl.textContent = '❌ New passwords do not match.';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPin === current) {
+    errEl.textContent = '❌ New password must be different from the current one.';
+    errEl.style.display = 'block'; return;
+  }
+
+  settings.pin = newPin;
+  saveLocal();
+  if (DB_MODE==='firebase') await fbSaveSettings();
+
+  // Clear fields
+  document.getElementById('pin-current').value='';
+  document.getElementById('pin-new').value='';
+  document.getElementById('pin-confirm').value='';
+
+  showToast('✅ Admin password updated successfully');
 }
 
 // ═══════════════════════════════════════════════════════
