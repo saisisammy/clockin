@@ -331,27 +331,43 @@ header {
 /* Remember Me toggle */
 .remember-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-md); margin-bottom: 12px;
-  cursor: pointer; transition: border-color 0.2s;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: 2px solid var(--border2);
+  border-radius: var(--r-lg);
+  margin: 14px 0 4px;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s;
   -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+  /* Always take full width, never hidden by overflow */
+  width: 100%; box-sizing: border-box;
 }
-.remember-row:hover { border-color: var(--teal); }
-.remember-row-text { font-size: 13px; color: var(--text2); font-weight: 600; }
-.remember-row-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.remember-row.on {
+  border-color: var(--teal);
+  background: linear-gradient(135deg, rgba(15,212,192,0.1), rgba(56,189,248,0.06));
+}
+.remember-row:active { opacity: 0.85; }
+.remember-row-left { display: flex; align-items: center; gap: 12px; }
+.remember-row-icon {
+  font-size: 22px; flex-shrink: 0; line-height: 1;
+}
+.remember-row-text { font-size: 14px; color: var(--text); font-weight: 700; line-height: 1.2; }
+.remember-row-sub  { font-size: 12px; color: var(--text3); margin-top: 3px; font-weight: 400; }
 .toggle-switch {
-  width: 42px; height: 24px; border-radius: 12px; flex-shrink: 0;
-  background: var(--border2); position: relative; transition: background 0.25s;
+  width: 52px; height: 30px; border-radius: 15px; flex-shrink: 0;
+  background: var(--border2); position: relative;
+  transition: background 0.3s;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
 }
 .toggle-switch.on { background: var(--teal); }
 .toggle-knob {
-  position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; transition: transform 0.25s;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  position: absolute; top: 4px; left: 4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
-.toggle-switch.on .toggle-knob { transform: translateX(18px); }
+.toggle-switch.on .toggle-knob { transform: translateX(22px); }
 
 /* Remembered-name banner */
 .remembered-banner {
@@ -811,11 +827,14 @@ header {
       <div class="t-dropdown" id="t-dropdown"></div>
     </div>
 
-    <!-- Remember Me toggle -->
-    <div class="remember-row" id="remember-row" onclick="toggleRememberMe()" style="display:none;">
-      <div>
-        <div class="remember-row-text">Remember me on this device</div>
-        <div class="remember-row-sub">Auto-select your name next time</div>
+    <!-- Remember Me toggle — always rendered, visibility controlled by JS -->
+    <div class="remember-row" id="remember-row" onclick="toggleRememberMe()" style="display:none;" role="switch" aria-checked="false">
+      <div class="remember-row-left">
+        <div class="remember-row-icon" id="remember-icon">🔔</div>
+        <div>
+          <div class="remember-row-text">Remember me</div>
+          <div class="remember-row-sub" id="remember-sub">Tap to save your name on this device</div>
+        </div>
       </div>
       <div class="toggle-switch" id="remember-toggle">
         <div class="toggle-knob"></div>
@@ -1542,10 +1561,7 @@ function selectTeacher(id) {
 
   // Show remember-me toggle whenever a teacher is selected
   document.getElementById('remember-row').style.display = 'flex';
-
-  // Sync toggle state
-  const tog = document.getElementById('remember-toggle');
-  if (rememberMeOn) tog.classList.add('on'); else tog.classList.remove('on');
+  syncRememberUI();
 
   // If remember-me is on, persist this selection
   if (rememberMeOn) {
@@ -1575,8 +1591,7 @@ function clearTeacher() {
 function toggleRememberMe() {
   rememberMeOn = !rememberMeOn;
   localStorage.setItem('et_remember_me', rememberMeOn ? '1' : '0');
-  const tog = document.getElementById('remember-toggle');
-  tog.classList.toggle('on', rememberMeOn);
+  syncRememberUI();
 
   if (rememberMeOn && selectedTeacher) {
     rememberedId = selectedTeacher.id;
@@ -1593,6 +1608,23 @@ function toggleRememberMe() {
     }
     showToast('👋 Remember me turned off');
   }
+}
+
+// Sync all remember-me UI elements to current state
+function syncRememberUI() {
+  const row  = document.getElementById('remember-row');
+  const tog  = document.getElementById('remember-toggle');
+  const icon = document.getElementById('remember-icon');
+  const sub  = document.getElementById('remember-sub');
+
+  tog.classList.toggle('on', rememberMeOn);
+  row.classList.toggle('on', rememberMeOn);
+  row.setAttribute('aria-checked', rememberMeOn ? 'true' : 'false');
+
+  if (icon) icon.textContent = rememberMeOn ? '🔖' : '🔔';
+  if (sub) sub.textContent = rememberMeOn
+    ? 'Your name is saved on this device'
+    : 'Tap to save your name on this device';
 }
 
 // ── Show the remembered banner ──
@@ -1612,7 +1644,7 @@ function restoreRememberedTeacher() {
   showRememberedBanner(t);
   document.getElementById('search-wrap').style.display = 'none';
   document.getElementById('remember-row').style.display = 'flex';
-  document.getElementById('remember-toggle').classList.add('on');
+  syncRememberUI();
   updateClockButtons(); drawMap();
   if (activeSessions[t.id]) startSessionTimer(t);
 }
