@@ -1402,40 +1402,127 @@ function useMyLocation() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  GPS
+//  GPS — with smoothing, hysteresis & accuracy gating
 // ═══════════════════════════════════════════════════════
+
+// Rolling window of recent raw readings for weighted averaging
+const GPS_HISTORY   = [];
+const MAX_SAMPLES   = 6;      // keep last 6 readings
+const MAX_ACC       = 150;    // ignore readings worse than 150 m accuracy
+const BUFFER_M      = 40;     // hysteresis band: must be 40 m clear of boundary to flip
+const CONFIRM_COUNT = 2;      // need this many consecutive readings agreeing before flipping
+
+let pendingInside   = null;   // candidate new state waiting for confirmation
+let confirmCount    = 0;      // how many consecutive readings confirm pendingInside
+
 function startGPS() {
   if (!navigator.geolocation) { showGeoErr('Geolocation not supported by this browser.'); return; }
-  navigator.geolocation.watchPosition(onGPS, onGPSErr, {enableHighAccuracy:true, maximumAge:4000, timeout:12000});
+  navigator.geolocation.watchPosition(onGPS, onGPSErr,
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
 }
 
 function onGPS(pos) {
   document.getElementById('geo-err').classList.remove('show');
-  userPos = {lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy};
-  document.getElementById('coord-txt').textContent = `${userPos.lat.toFixed(5)}, ${userPos.lng.toFixed(5)}`;
-  if (settings.lat && settings.lng) {
-    const d = haversine(userPos, {lat:settings.lat, lng:settings.lng});
-    document.getElementById('dist-txt').textContent = `${Math.round(d)}m away`;
-    const was = isInside;
-    isInside = d <= settings.radius;
-    if (isInside !== was) onZoneChange();
+
+  const raw = {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    acc: pos.coords.accuracy,    // metres — lower is better
+    ts:  Date.now()
+  };
+
+  // ── Accuracy gate: discard very noisy fixes ──
+  if (raw.acc > MAX_ACC) {
+    document.getElementById('dist-txt').textContent =
+      `GPS accuracy ±${Math.round(raw.acc)}m — waiting for better fix…`;
+    return;
   }
+
+  // ── Add to rolling history (newest first) ──
+  GPS_HISTORY.unshift(raw);
+  if (GPS_HISTORY.length > MAX_SAMPLES) GPS_HISTORY.pop();
+
+  // ── Weighted average position (weight = 1 / accuracy²) ──
+  let wLat = 0, wLng = 0, wSum = 0;
+  GPS_HISTORY.forEach(r => {
+    const w = 1 / (r.acc * r.acc);
+    wLat += r.lat * w;
+    wLng += r.lng * w;
+    wSum += w;
+  });
+  const avgLat = wLat / wSum;
+  const avgLng = wLng / wSum;
+  const avgAcc = Math.round(Math.sqrt(1 / wSum));   // effective accuracy of average
+
+  userPos = { lat: avgLat, lng: avgLng, acc: avgAcc };
+
+  document.getElementById('coord-txt').textContent =
+    `${avgLat.toFixed(5)}, ${avgLng.toFixed(5)} ±${avgAcc}m`;
+
+  if (!settings.lat || !settings.lng) { drawMap(); updateClockButtons(); return; }
+
+  const dist = haversine(userPos, { lat: settings.lat, lng: settings.lng });
+
+  // ── Distance display ──
+  const diffFromEdge = dist - settings.radius;
+  const edgeLabel = Math.abs(Math.round(diffFromEdge));
+  document.getElementById('dist-txt').textContent = diffFromEdge > 0
+    ? `${Math.round(dist)}m — ${edgeLabel}m outside zone`
+    : `${Math.round(dist)}m — ${edgeLabel}m inside zone`;
+
+  // ── Hysteresis: compute candidate state ──
+  // To flip FROM outside→inside: must be at least BUFFER_M inside the radius
+  // To flip FROM inside→outside: must be at least BUFFER_M outside the radius
+  let candidate;
+  if (isInside) {
+    // Currently inside — only flip outside if clearly beyond radius + buffer
+    candidate = dist <= (settings.radius + BUFFER_M);
+  } else {
+    // Currently outside — only flip inside if clearly within radius - buffer
+    candidate = dist <= (settings.radius - BUFFER_M);
+  }
+
+  // ── Confirmation: require CONFIRM_COUNT consecutive readings ──
+  if (candidate !== pendingInside) {
+    pendingInside = candidate;
+    confirmCount  = 1;
+  } else {
+    confirmCount++;
+  }
+
+  if (confirmCount >= CONFIRM_COUNT && candidate !== isInside) {
+    isInside     = candidate;
+    confirmCount = 0;
+    onZoneChange();
+  }
+
   drawMap(); updateClockButtons();
 }
+
 function onGPSErr(e) { showGeoErr(geoErrMsg(e)); }
 function geoErrMsg(e) {
-  return {1:'Location permission denied. Allow access in browser settings.',
-          2:'GPS unavailable. Enable location services.',
-          3:'Location timed out. Try again.'}[e.code] || `GPS error (${e.code})`;
+  return {
+    1: 'Location permission denied. Allow access in browser settings.',
+    2: 'GPS unavailable. Enable location services on your device.',
+    3: 'Location timed out. Move to an open area and try again.'
+  }[e.code] || `GPS error (code ${e.code})`;
 }
-function showGeoErr(m) { const el=document.getElementById('geo-err'); el.textContent='⚠️ '+m; el.classList.add('show'); }
+function showGeoErr(m) {
+  const el = document.getElementById('geo-err');
+  el.textContent = '⚠️ ' + m; el.classList.add('show');
+}
 
 function onZoneChange() {
   const s = document.getElementById('zone-status');
   const t = document.getElementById('zone-status-txt');
-  if (isInside) { s.classList.add('inside'); t.textContent='Inside Zone'; showToast('✅ You are inside the school zone'); }
-  else { s.classList.remove('inside'); t.textContent='Outside Zone'; showToast('⚠️ You left the school zone');
-    if (selectedTeacher && activeSessions[selectedTeacher.id]) doClockOut(true); }
+  if (isInside) {
+    s.classList.add('inside'); t.textContent = 'Inside Zone';
+    showToast('✅ You are inside the school zone');
+  } else {
+    s.classList.remove('inside'); t.textContent = 'Outside Zone';
+    showToast('⚠️ You left the school zone');
+    if (selectedTeacher && activeSessions[selectedTeacher.id]) doClockOut(true);
+  }
   updateClockButtons();
 }
 
