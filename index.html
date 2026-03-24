@@ -1402,59 +1402,120 @@ function useMyLocation() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  GPS — with smoothing, hysteresis & accuracy gating
+//  GPS — fast startup + smoothing + hysteresis
 // ═══════════════════════════════════════════════════════
 
-// Rolling window of recent raw readings for weighted averaging
 const GPS_HISTORY   = [];
-const MAX_SAMPLES   = 6;      // keep last 6 readings
-const MAX_ACC       = 150;    // ignore readings worse than 150 m accuracy
-const BUFFER_M      = 40;     // hysteresis band: must be 40 m clear of boundary to flip
-const CONFIRM_COUNT = 2;      // need this many consecutive readings agreeing before flipping
+const MAX_SAMPLES   = 5;    // rolling window size (smaller = faster settling)
+const MAX_ACC       = 200;  // ignore fixes worse than 200m (raised to accept faster first fix)
+const BUFFER_M      = 40;   // hysteresis band around fence edge (metres)
+const CONFIRM_COUNT = 2;    // readings needed to confirm a zone change
+// On first load, skip confirmation and accept immediately if well inside/outside
+const FAST_ZONE_M   = 80;   // if >80m clear of boundary, flip instantly on first fix
 
-let pendingInside   = null;   // candidate new state waiting for confirmation
-let confirmCount    = 0;      // how many consecutive readings confirm pendingInside
+let pendingInside = null;
+let confirmCount  = 0;
+let gpsReady      = false;  // true once we have at least one accepted fix
+
+// ─── Cached last position (survives page reload) ───
+function saveCachedPos(lat, lng, acc) {
+  try {
+    localStorage.setItem('et_last_pos', JSON.stringify({ lat, lng, acc, ts: Date.now() }));
+  } catch(e) {}
+}
+function loadCachedPos() {
+  try {
+    const v = localStorage.getItem('et_last_pos');
+    if (!v) return null;
+    const p = JSON.parse(v);
+    // Only use cache if less than 10 minutes old
+    if (Date.now() - p.ts > 10 * 60 * 1000) return null;
+    return p;
+  } catch(e) { return null; }
+}
 
 function startGPS() {
   if (!navigator.geolocation) { showGeoErr('Geolocation not supported by this browser.'); return; }
-  navigator.geolocation.watchPosition(onGPS, onGPSErr,
-    { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
+
+  // ── Step 1: Show cached position instantly while GPS warms up ──
+  const cached = loadCachedPos();
+  if (cached && settings.lat && settings.lng) {
+    userPos = cached;
+    const dist = haversine(cached, { lat: settings.lat, lng: settings.lng });
+    // Use cached position to give instant feedback — but mark as "estimated"
+    const diffFromEdge = dist - settings.radius;
+    const edgeLabel = Math.abs(Math.round(diffFromEdge));
+    document.getElementById('coord-txt').textContent =
+      `${cached.lat.toFixed(5)}, ${cached.lng.toFixed(5)} (cached)`;
+    document.getElementById('dist-txt').textContent = diffFromEdge > 0
+      ? `~${Math.round(dist)}m — ${edgeLabel}m outside zone (updating…)`
+      : `~${Math.round(dist)}m — ${edgeLabel}m inside zone (updating…)`;
+    // Tentatively set zone from cache so buttons are not stuck on "outside"
+    const tentative = dist <= settings.radius;
+    if (tentative !== isInside) { isInside = tentative; onZoneChange(); }
+    drawMap(); updateClockButtons();
+  }
+
+  // ── Step 2: Fire getCurrentPosition immediately for a fast first fix ──
+  // maximumAge:30000 allows the browser to return a recently cached position
+  // immediately (sub-second) instead of waiting for a fresh satellite lock
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      onGPS(pos, true);  // true = fast-path, skip confirmation requirement
+    },
+    () => {},  // silent fail — watchPosition will still run
+    { enableHighAccuracy: true, maximumAge: 30000, timeout: 8000 }
+  );
+
+  // ── Step 3: Start continuous watch for ongoing updates ──
+  navigator.geolocation.watchPosition(
+    pos => onGPS(pos, false),
+    onGPSErr,
+    { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 }
+  );
 }
 
-function onGPS(pos) {
+function onGPS(pos, fastPath) {
   document.getElementById('geo-err').classList.remove('show');
 
   const raw = {
     lat: pos.coords.latitude,
     lng: pos.coords.longitude,
-    acc: pos.coords.accuracy,    // metres — lower is better
+    acc: pos.coords.accuracy,
     ts:  Date.now()
   };
 
-  // ── Accuracy gate: discard very noisy fixes ──
+  // ── Accuracy gate ──
   if (raw.acc > MAX_ACC) {
-    document.getElementById('dist-txt').textContent =
-      `GPS accuracy ±${Math.round(raw.acc)}m — waiting for better fix…`;
+    if (!gpsReady) {
+      document.getElementById('dist-txt').textContent =
+        `📡 GPS accuracy ±${Math.round(raw.acc)}m — acquiring better fix…`;
+    }
     return;
   }
 
-  // ── Add to rolling history (newest first) ──
-  GPS_HISTORY.unshift(raw);
-  if (GPS_HISTORY.length > MAX_SAMPLES) GPS_HISTORY.pop();
+  // ── Add to rolling history ──
+  // Avoid duplicate from getCurrentPosition + watchPosition firing near-simultaneously
+  const isDuplicate = GPS_HISTORY.length > 0 &&
+    Math.abs(GPS_HISTORY[0].ts - raw.ts) < 1000 &&
+    Math.abs(GPS_HISTORY[0].lat - raw.lat) < 0.00001;
+  if (!isDuplicate) {
+    GPS_HISTORY.unshift(raw);
+    if (GPS_HISTORY.length > MAX_SAMPLES) GPS_HISTORY.pop();
+  }
 
-  // ── Weighted average position (weight = 1 / accuracy²) ──
+  // ── Weighted average (weight = 1 / acc²) ──
   let wLat = 0, wLng = 0, wSum = 0;
   GPS_HISTORY.forEach(r => {
     const w = 1 / (r.acc * r.acc);
-    wLat += r.lat * w;
-    wLng += r.lng * w;
-    wSum += w;
+    wLat += r.lat * w; wLng += r.lng * w; wSum += w;
   });
   const avgLat = wLat / wSum;
   const avgLng = wLng / wSum;
-  const avgAcc = Math.round(Math.sqrt(1 / wSum));   // effective accuracy of average
+  const avgAcc = Math.round(Math.sqrt(1 / wSum));
 
   userPos = { lat: avgLat, lng: avgLng, acc: avgAcc };
+  saveCachedPos(avgLat, avgLng, avgAcc);
 
   document.getElementById('coord-txt').textContent =
     `${avgLat.toFixed(5)}, ${avgLng.toFixed(5)} ±${avgAcc}m`;
@@ -1463,26 +1524,39 @@ function onGPS(pos) {
 
   const dist = haversine(userPos, { lat: settings.lat, lng: settings.lng });
 
-  // ── Distance display ──
   const diffFromEdge = dist - settings.radius;
-  const edgeLabel = Math.abs(Math.round(diffFromEdge));
+  const edgeLabel    = Math.abs(Math.round(diffFromEdge));
   document.getElementById('dist-txt').textContent = diffFromEdge > 0
     ? `${Math.round(dist)}m — ${edgeLabel}m outside zone`
     : `${Math.round(dist)}m — ${edgeLabel}m inside zone`;
 
-  // ── Hysteresis: compute candidate state ──
-  // To flip FROM outside→inside: must be at least BUFFER_M inside the radius
-  // To flip FROM inside→outside: must be at least BUFFER_M outside the radius
+  // ── Determine candidate zone ──
   let candidate;
   if (isInside) {
-    // Currently inside — only flip outside if clearly beyond radius + buffer
     candidate = dist <= (settings.radius + BUFFER_M);
   } else {
-    // Currently outside — only flip inside if clearly within radius - buffer
     candidate = dist <= (settings.radius - BUFFER_M);
   }
 
-  // ── Confirmation: require CONFIRM_COUNT consecutive readings ──
+  // ── Fast-path: on first fix or getCurrentPosition result,
+  //    skip confirmation if position is clearly inside or outside the buffer ──
+  const clearMargin = Math.abs(dist - settings.radius);
+  const skipConfirm = (fastPath || !gpsReady) && clearMargin > FAST_ZONE_M;
+
+  if (skipConfirm) {
+    // Accept immediately — no need to wait for CONFIRM_COUNT readings
+    if (candidate !== isInside) {
+      isInside = candidate;
+      onZoneChange();
+    }
+    gpsReady = true;
+    drawMap(); updateClockButtons();
+    return;
+  }
+
+  gpsReady = true;
+
+  // ── Normal path: require confirmation ──
   if (candidate !== pendingInside) {
     pendingInside = candidate;
     confirmCount  = 1;
