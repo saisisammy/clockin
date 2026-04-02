@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f59e0b">
+<title>EduTrack · Super Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+const cfg = {
+  apiKey:"AIzaSyDl0XxDhlF52VVk36i0DvrVLuFrGjwIdhE",
+  authDomain:"clock-in-records.firebaseapp.com",
+  projectId:"clock-in-records",
+  storageBucket:"clock-in-records.firebasestorage.app",
+  messagingSenderId:"643705157075",
+  appId:"1:643705157075:web:03d8def9668b6e8c24ab26"
+};
+let db, ok=false;
+try { const app=initializeApp(cfg); db=getFirestore(app); ok=true; } catch(e){ console.warn('Firebase:',e.message); }
+window._fb = { db, ok, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where };
+window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<style>
+/* ══════════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════════ */
+:root{
+  --bg:#0b1120; --bg2:#111827; --surf:#1a2235; --surf2:#1f2a40;
+  --bdr:#2a3650; --bdr2:#334166;
+  --teal:#0fd4c0; --teal-d:rgba(15,212,192,.12); --teal-g:rgba(15,212,192,.25);
+  --rose:#f43f5e; --rose-d:rgba(244,63,94,.12);
+  --amber:#f59e0b; --amber-d:rgba(245,158,11,.12);
+  --sky:#38bdf8; --violet:#8b5cf6;
+  --gold:#f59e0b; --gold-d:rgba(245,158,11,.15);
+  --tx:#e2e8f0; --tx2:#94a3b8; --tx3:#64748b;
+  --r1:8px; --r2:12px; --r3:16px; --r4:20px;
+  --sh:0 4px 24px rgba(0,0,0,.4); --sh-t:0 0 32px rgba(245,158,11,.25);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 40% at 15% 10%,rgba(245,158,11,.06) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 35% at 85% 80%,rgba(139,92,246,.06) 0%,transparent 60%)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes splashPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;z-index:7000;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spl-icon{width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,var(--gold),var(--amber));
+  display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:var(--sh-t);
+  animation:splashPop .5s cubic-bezier(.34,1.56,.64,1) both}
+.spl-name{font-size:26px;font-weight:800;animation:fadeUp .4s .15s ease both}
+.spl-sub{font-size:13px;color:var(--tx3);animation:fadeUp .4s .25s ease both}
+.spl-spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--bdr2);border-top-color:var(--gold);
+  animation:spin .8s linear infinite,fadeUp .4s .35s ease both}
+.spl-attr{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-size:12px;color:var(--tx3);
+  animation:fadeUp .4s .5s ease both}
+.spl-attr strong{color:var(--gold);font-weight:700}
+
+/* ── SA LOGIN OVERLAY ── */
+#sa-login{position:fixed;inset:0;z-index:9000;background:var(--bg);
+  display:none;align-items:center;justify-content:center;padding:24px}
+#sa-login.open{display:flex}
+.login-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--r4);
+  padding:32px 28px;width:100%;max-width:380px;animation:popIn .35s cubic-bezier(.34,1.56,.64,1)}
+.login-icon{font-size:36px;text-align:center;margin-bottom:10px}
+.login-title{font-size:20px;font-weight:800;margin-bottom:4px;text-align:center}
+.login-sub{font-size:13px;color:var(--tx3);margin-bottom:22px;text-align:center;line-height:1.5}
+.login-err{font-size:12px;color:var(--rose);margin-bottom:10px;display:none}
+
+/* ── MODALS ── */
+.modal-bg{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.65);
+  display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--r4);
+  padding:28px;width:100%;max-width:360px;animation:popIn .3s cubic-bezier(.34,1.56,.64,1)}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:8px}
+.modal-text{font-size:13px;color:var(--tx2);margin-bottom:20px;line-height:1.6}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+
+/* ── HEADER ── */
+header{position:sticky;top:0;z-index:200;height:60px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 20px;
+  background:rgba(11,17,32,.88);border-bottom:1px solid rgba(245,158,11,.2);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.h-logo{display:flex;align-items:center;gap:10px}
+.h-logo-ic{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--amber));
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.h-logo-name{font-size:15px;font-weight:800}
+.h-logo-sub{font-size:11px;color:var(--gold);font-weight:700;font-family:'JetBrains Mono',monospace}
+.h-right{display:flex;align-items:center;gap:8px}
+.back-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--r2);
+  border:1px solid var(--bdr);background:var(--surf2);color:var(--tx2);
+  font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;
+  transition:all .2s;-webkit-tap-highlight-color:transparent;text-decoration:none}
+.back-btn:hover{border-color:var(--teal);color:var(--teal)}
+
+/* ── PAGE ── */
+.page{padding:20px 16px 40px;position:relative;z-index:5;min-height:calc(100vh - 60px)}
+
+/* ── TABS ── */
+.a-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:20px;padding-bottom:2px}
+.a-tabs::-webkit-scrollbar{display:none}
+.a-tab{flex-shrink:0;padding:8px 16px;border-radius:100px;border:1px solid var(--bdr);background:var(--surf);
+  color:var(--tx3);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.a-tab.on{background:var(--gold-d);border-color:var(--gold);color:var(--gold)}
+.a-sec{display:none}
+.a-sec.on{display:block}
+
+/* ── BADGE ── */
+.sa-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;
+  background:var(--gold-d);border:1px solid rgba(245,158,11,.3);
+  border-radius:100px;font-size:11px;font-weight:700;color:var(--gold);margin-bottom:16px}
+
+/* ── CARDS ── */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.card-ttl{font-size:13px;font-weight:700;color:var(--tx2)}
+.card-body{padding:18px}
+
+/* ── STATS ── */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:480px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat-p{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r3);padding:14px;text-align:center}
+.stat-n{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:600;color:var(--gold)}
+.stat-l{font-size:11px;color:var(--tx3);margin-top:4px}
+
+/* ── SCHOOL CARDS ── */
+.sa-school-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);
+  padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease}
+.sa-sc-ic{width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+.sa-sc-info{flex:1;min-width:0}
+.sa-sc-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-sc-meta{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.sa-sc-btns{display:flex;gap:6px;flex-shrink:0}
+
+/* ── FORMS ── */
+.f-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:6px}
+.f-in{width:100%;padding:12px 14px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r2);
+  color:var(--tx);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;outline:none;transition:all .2s;-webkit-appearance:none}
+.f-in:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-d)}
+.f-row{margin-bottom:14px}
+.f-note{font-size:11px;color:var(--tx3);margin-top:4px}
+
+/* ── BUTTONS ── */
+.btn{padding:11px 20px;border-radius:var(--r2);border:none;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.btn-t{background:var(--teal);color:#0b1120}
+.btn-t:hover{opacity:.88}
+.btn-t:active{transform:scale(.97)}
+.btn-g{background:var(--gold);color:#0b1120}
+.btn-g:hover{opacity:.88}
+.btn-g:active{transform:scale(.97)}
+.btn-gh{background:var(--surf2);border:1px solid var(--bdr);color:var(--tx2)}
+.btn-gh:hover{border-color:var(--teal);color:var(--teal)}
+.btn-d{background:var(--rose-d);border:1px solid rgba(244,63,94,.3);color:var(--rose)}
+.btn-d:hover{background:rgba(244,63,94,.2)}
+.btn-sm{padding:7px 14px;font-size:13px}
+.btn-full{width:100%}
+
+/* ── INFO BOX ── */
+.info-box{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;
+  background:var(--amber-d);border:1px solid rgba(245,158,11,.25);border-radius:var(--r2);
+  margin-bottom:20px;font-size:12px;color:#fcd34d;line-height:1.6}
+.info-box-ic{font-size:18px;flex-shrink:0;margin-top:1px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--surf2);border:1px solid var(--bdr2);border-radius:100px;
+  padding:11px 22px;font-size:13px;font-weight:600;z-index:9999;
+  opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  white-space:nowrap;max-width:calc(100vw - 40px);box-shadow:var(--sh)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── ATTRIBUTION ── */
+.attr{text-align:center;padding:10px 16px 20px;font-size:11px;color:var(--tx3)}
+.attr span{color:var(--gold);font-weight:700}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:32px 16px}
+.empty-ic{font-size:36px;margin-bottom:8px}
+.empty-tx{font-size:14px;color:var(--tx3)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
+
+/* ── PIN WRAP ── */
+.pin-wrap{position:relative}
+.pin-wrap .f-in{padding-right:44px}
+.pin-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--tx3);cursor:pointer;font-size:16px;padding:4px}
+
+/* ── RESPONSIVE ── */
+@media(max-width:480px){
+  header{padding:0 14px}
+  .page{padding:14px 12px 30px}
+}
+@media(min-width:768px){.page{max-width:720px;margin:0 auto}}
+@media(min-width:1024px){.page{max-width:900px}}
+</style>
+</head>
+<body>
+
+<!-- ══ SPLASH ══ -->
+<div id="splash">
+  <div class="spl-icon">⭐</div>
+  <div class="spl-name">Super Admin</div>
+  <div class="spl-sub">EduTrack Management Panel</div>
+  <div class="spl-spin"></div>
+  <div class="spl-attr">Powered by <strong>Mr. Saisi Nyongesa Sammy</strong></div>
+</div>
+
+<!-- ══ SA LOGIN OVERLAY ══ -->
+<div id="sa-login" class="open">
+  <div class="login-box">
+    <div class="login-icon">⭐</div>
+    <div class="login-title">Super Admin</div>
+    <div class="login-sub">Enter the master password to manage all schools</div>
+    <div class="f-row">
+      <label class="f-lbl">Master Password</label>
+      <div class="pin-wrap">
+        <input type="password" class="f-in" id="sa-pin" placeholder="••••••••" maxlength="20"
+          onkeydown="if(event.key==='Enter')doSALogin()">
+        <button class="pin-eye" onclick="toggleEye('sa-pin',this)">👁</button>
+      </div>
+    </div>
+    <div class="login-err" id="sa-err">Incorrect master password. Try again.</div>
+    <button class="btn btn-g btn-full" onclick="doSALogin()" style="margin-bottom:10px">⭐ Enter Super Admin</button>
+    <a href="index.html" class="btn btn-gh btn-full" style="display:block;text-align:center;text-decoration:none">← Back to App</a>
+  </div>
+</div>
+
+<!-- ══ HEADER (shown after login) ══ -->
+<header id="main-header" style="display:none">
+  <div class="h-logo">
+    <div class="h-logo-ic">⭐</div>
+    <div>
+      <div class="h-logo-name">EduTrack</div>
+      <div class="h-logo-sub">⭐ SUPER ADMIN</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <a href="index.html" class="back-btn">← Back to App</a>
+  </div>
+</header>
+
+<!-- ══ MAIN PAGE (shown after login) ══ -->
+<div class="page" id="main-page" style="display:none">
+  <div class="sa-badge">⭐ Super Admin Panel</div>
+  <div class="a-tabs" id="sa-tabs">
+    <div class="a-tab on" onclick="saNav('schools',this)">🏫 Schools</div>
+    <div class="a-tab" onclick="saNav('register',this)">➕ Register School</div>
+    <div class="a-tab" onclick="saNav('sysoverview',this)">📊 System Overview</div>
+  </div>
+
+  <!-- SCHOOLS LIST -->
+  <div class="a-sec on" id="sa-schools">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-ttl">Registered Schools</span>
+        <span id="sa-count" style="font-size:12px;color:var(--tx3);font-family:'JetBrains Mono',monospace"></span>
+      </div>
+      <div class="card-body" id="sa-school-list">
+        <div class="empty"><div class="empty-ic">⏳</div><div class="empty-tx">Loading schools…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTER SCHOOL -->
+  <div class="a-sec" id="sa-register">
+    <div class="info-box">
+      <div class="info-box-ic">ℹ️</div>
+      <div>
+        <strong>Geofence &amp; Location Setup</strong><br>
+        School coordinates and geofence radius are configured by the school admin in their Admin Settings panel after the school is registered. Super Admin only handles school registration and credentials here.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-ttl">🏫 Register New School</span></div>
+      <div class="card-body">
+        <div class="f-row">
+          <label class="f-lbl">School Name *</label>
+          <input type="text" class="f-in" id="sa-sname" placeholder="e.g. Sunrise Primary School">
+        </div>
+        <div class="f-row">
+          <label class="f-lbl">School ID * <span style="font-weight:400;text-transform:none;color:var(--tx3)">(unique, e.g. sunrise-primary)</span></label>
+          <input type="text" class="f-in" id="sa-sid" placeholder="sunrise-primary" oninput="sanitizeID(this)">
+          <div class="f-note">Lowercase letters, numbers, hyphens only. This is the database key — cannot be changed later.</div>
+        </div>
+        <div class="f-row">
+          <label class="f-lbl">Admin PIN * (min 4 chars)</label>
+          <div class="pin-wrap">
+            <input type="password" class="f-in" id="sa-spin" placeholder="e.g. 1234" maxlength="8">
+            <button class="pin-eye" onclick="toggleEye('sa-spin',this)">👁</button>
+          </div>
+          <div class="f-note">The PIN the school admin will use to access their dashboard.</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn btn-g" id="sa-reg-btn" onclick="registerSchool()">🏫 Register School</button>
+        </div>
+        <div id="sa-reg-err" style="font-size:12px;color:var(--rose);display:none"></div>
+        <div id="sa-reg-ok" style="font-size:12px;color:var(--teal);display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYSTEM OVERVIEW -->
+  <div class="a-sec" id="sa-sysoverview">
+    <div class="stats">
+      <div class="stat-p"><div class="stat-n" id="sa-st-schools">0</div><div class="stat-l">Schools</div></div>
+      <div class="stat-p"><div class="stat-n" id="sa-st-teachers">0</div><div class="stat-l">Total Teachers</div></div>
+      <div class="stat-p"><div class="stat-n" id="sa-st-checkins">0</div><div class="stat-l">Today Check-ins</div></div>
+      <div class="stat-p"><div class="stat-n" id="sa-st-active">0</div><div class="stat-l">Currently In</div></div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:12px">🏫 Per-School Summary</div>
+    <div id="sa-summary">
+      <div class="empty"><div class="empty-ic">📊</div><div class="empty-tx">Loading…</div></div>
+    </div>
+    <button class="btn btn-gh btn-sm" onclick="loadSAOverview(true)" style="margin-top:10px">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- ══ DELETE SCHOOL MODAL ══ -->
+<div class="modal-bg" id="del-school-modal">
+  <div class="modal-box">
+    <div class="modal-title">🗑 Delete School?</div>
+    <div class="modal-text" id="del-school-txt">All data for this school will be permanently deleted.</div>
+    <div class="modal-btns">
+      <button class="btn btn-gh btn-sm" onclick="closeDelSchoolModal()">Cancel</button>
+      <button class="btn btn-d btn-sm" onclick="confirmDeleteSchool()">Delete School</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="attr">Powered by <span>Mr. Saisi Nyongesa Sammy</span></div>
+
+<script>
+'use strict';
+
+// ── MASTER PASSWORD ──
+const SA_PIN = 'superadmin2024';
+
+// ── STATE ──
+let DB = 'local';
+let fb = null;
+let allSchools = [];
+let pendDelSchoolId = null;
+
+// ─────────────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────────────
+function boot() {
+  if (window._fb?.ok) {
+    DB = 'firebase';
+    fb = window._fb;
+  }
+  hideSplash();
+}
+
+function hideSplash() {
+  const s = el('splash');
+  s.style.opacity = '0';
+  s.style.transition = 'opacity .4s';
+  setTimeout(() => s.style.display = 'none', 400);
+}
+
+window.addEventListener('fb-ready', boot, { once: true });
+// Fallback in case fb-ready fired before listener attached
+setTimeout(() => {
+  if (!el('splash').style.opacity) {
+    if (window._fb?.ok) { DB='firebase'; fb=window._fb; }
+    hideSplash();
+  }
+}, 2500);
+
+// ─────────────────────────────────────────────────────
+//  AUTH
+// ─────────────────────────────────────────────────────
+function doSALogin() {
+  const val = el('sa-pin').value;
+  if (val === SA_PIN) {
+    el('sa-login').classList.remove('open');
+    el('sa-pin').value = '';
+    el('sa-err').style.display = 'none';
+    el('main-header').style.display = '';
+    el('main-page').style.display = '';
+    loadAllSchools().then(() => {
+      renderSASchools();
+      loadSAOverview(false);
+    }).catch(e => console.warn('Load error:', e));
+  } else {
+    el('sa-err').style.display = 'block';
+    el('sa-pin').value = '';
+    setTimeout(() => el('sa-pin').focus(), 50);
+  }
+}
+
+// ─────────────────────────────────────────────────────
+//  NAVIGATION
+// ─────────────────────────────────────────────────────
+function saNav(sec, btn) {
+  document.querySelectorAll('.a-tab').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.a-sec').forEach(s => s.classList.remove('on'));
+  btn.classList.add('on');
+  el('sa-' + sec).classList.add('on');
+  if (sec === 'schools') renderSASchools();
+  if (sec === 'sysoverview') loadSAOverview(false);
+}
+
+// ─────────────────────────────────────────────────────
+//  SCHOOLS DATA
+// ─────────────────────────────────────────────────────
+async function loadAllSchools() {
+  if (DB !== 'firebase') return;
+  const { db, collection, getDocs } = fb;
+  const snap = await getDocs(collection(db, 'schools'));
+  allSchools = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.schoolName || a.id).localeCompare(b.schoolName || b.id));
+}
+
+function renderSASchools() {
+  const c = el('sa-school-list');
+  el('sa-count').textContent = `${allSchools.length} school${allSchools.length !== 1 ? 's' : ''}`;
+  if (!allSchools.length) {
+    c.innerHTML = '<div class="empty"><div class="empty-ic">🏫</div><div class="empty-tx">No schools registered yet</div></div>';
+    return;
+  }
+  c.innerHTML = allSchools.map(s => `
+    <div class="sa-school-card">
+      <div class="sa-sc-ic">🏫</div>
+      <div class="sa-sc-info">
+        <div class="sa-sc-name">${esc(s.schoolName || s.id)}</div>
+        <div class="sa-sc-meta">ID: ${esc(s.id)} · ${s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-KE') : '—'}</div>
+      </div>
+      <div class="sa-sc-btns">
+        <button class="btn btn-t btn-sm" onclick="saEnterSchool('${esc(s.id)}')">Open App</button>
+        <button class="btn btn-d btn-sm" onclick="openDelSchoolModal('${esc(s.id)}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function loadSAOverview(force) {
+  if (DB !== 'firebase') return;
+  const { db, collection, getDocs } = fb;
+  el('sa-summary').innerHTML = '<div class="empty"><div class="empty-ic">⏳</div><div class="empty-tx">Loading…</div></div>';
+  let totT = 0, todayCI = 0, curIn = 0;
+  const today = new Date().toDateString();
+  let html = '';
+  for (const s of allSchools) {
+    try {
+      const ts = await getDocs(collection(db, 'schools', s.id, 'teachers'));
+      const rs = await getDocs(collection(db, 'schools', s.id, 'records'));
+      const ss = await getDocs(collection(db, 'schools', s.id, 'sessions'));
+      const tCI = rs.docs.filter(d => {
+        const r = d.data();
+        return new Date(r.ts).toDateString() === today && r.type === 'in';
+      }).length;
+      totT += ts.size; todayCI += tCI; curIn += ss.size;
+      html += `<div class="sa-school-card"><div class="sa-sc-ic">🏫</div><div class="sa-sc-info"><div class="sa-sc-name">${esc(s.schoolName || s.id)}</div><div class="sa-sc-meta">👥 ${ts.size} teachers · ✅ ${tCI} today · 🟢 ${ss.size} in now</div></div></div>`;
+    } catch (e) {
+      html += `<div class="sa-school-card"><div class="sa-sc-ic">⚠️</div><div class="sa-sc-info"><div class="sa-sc-name">${esc(s.schoolName || s.id)}</div><div class="sa-sc-meta" style="color:var(--rose)">Failed to load data</div></div></div>`;
+    }
+  }
+  el('sa-st-schools').textContent = allSchools.length;
+  el('sa-st-teachers').textContent = totT;
+  el('sa-st-checkins').textContent = todayCI;
+  el('sa-st-active').textContent = curIn;
+  el('sa-summary').innerHTML = html || '<div class="empty"><div class="empty-ic">🏫</div><div class="empty-tx">No schools yet</div></div>';
+}
+
+// ─────────────────────────────────────────────────────
+//  REGISTER SCHOOL
+//  Note: lat/lng/radius are NOT set here.
+//  The school admin configures those in their Admin Settings.
+// ─────────────────────────────────────────────────────
+function sanitizeID(inp) {
+  inp.value = inp.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+async function registerSchool() {
+  const name = el('sa-sname').value.trim();
+  const id   = el('sa-sid').value.trim();
+  const pin  = el('sa-spin').value.trim();
+  const errEl = el('sa-reg-err'), okEl = el('sa-reg-ok');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+
+  if (!name)            { errEl.textContent = '❌ School name required.'; errEl.style.display = 'block'; return; }
+  if (!id || id.length < 3) { errEl.textContent = '❌ School ID must be at least 3 characters.'; errEl.style.display = 'block'; return; }
+  if (pin.length < 4)   { errEl.textContent = '❌ Admin PIN must be at least 4 characters.'; errEl.style.display = 'block'; return; }
+  if (allSchools.find(s => s.id === id)) { errEl.textContent = '❌ A school with that ID already exists.'; errEl.style.display = 'block'; return; }
+
+  const btn = el('sa-reg-btn'); btn.textContent = '⏳ Registering…'; btn.disabled = true;
+  try {
+    if (DB === 'firebase') {
+      const { db, doc, setDoc } = fb;
+      const createdAt = new Date().toISOString();
+      await setDoc(doc(db, 'schools', id), { schoolName: name, id, createdAt });
+      // lat/lng/radius left as null/default — admin will configure via their Settings tab
+      await setDoc(doc(db, 'schools', id, 'config', 'settings'), {
+        schoolName: name,
+        lat: null,
+        lng: null,
+        radius: 300,
+        pin
+      });
+    }
+    allSchools.push({ id, schoolName: name, createdAt: new Date().toISOString() });
+    allSchools.sort((a, b) => (a.schoolName || a.id).localeCompare(b.schoolName || b.id));
+    ['sa-sname', 'sa-sid', 'sa-spin'].forEach(i => el(i).value = '');
+    okEl.textContent = `✅ "${name}" registered! The school admin can now set their location in Settings.`;
+    okEl.style.display = 'block';
+    renderSASchools();
+    showToast(`✅ ${name} registered`);
+  } catch (e) {
+    console.error('Register error:', e);
+    errEl.textContent = '❌ Registration failed: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = '🏫 Register School'; btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────
+//  ENTER SCHOOL → redirect to main app
+// ─────────────────────────────────────────────────────
+function saEnterSchool(id) {
+  localStorage.setItem('et_school', id);
+  window.location.href = 'index.html';
+}
+
+// ─────────────────────────────────────────────────────
+//  DELETE SCHOOL
+// ─────────────────────────────────────────────────────
+function openDelSchoolModal(id) {
+  pendDelSchoolId = id;
+  const s = allSchools.find(s => s.id === id);
+  el('del-school-txt').textContent = `Delete "${s?.schoolName || id}"? All teachers, records, and settings will be permanently deleted. This cannot be undone.`;
+  el('del-school-modal').classList.add('open');
+}
+function closeDelSchoolModal() {
+  el('del-school-modal').classList.remove('open');
+  pendDelSchoolId = null;
+}
+async function confirmDeleteSchool() {
+  const id = pendDelSchoolId; if (!id) return;
+  closeDelSchoolModal();
+  showToast('⏳ Deleting…');
+  if (DB === 'firebase') {
+    const { db, doc, collection, deleteDoc, getDocs } = fb;
+    try {
+      for (const sub of ['teachers', 'records', 'sessions', 'config']) {
+        const sn = await getDocs(collection(db, 'schools', id, sub));
+        for (const d of sn.docs) await deleteDoc(doc(db, 'schools', id, sub, d.id));
+      }
+      await deleteDoc(doc(db, 'schools', id));
+    } catch (e) { console.error('Delete school error:', e); }
+  }
+  allSchools = allSchools.filter(s => s.id !== id);
+  renderSASchools();
+  loadSAOverview(true);
+  showToast('✅ School deleted');
+}
+
+// ─────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toggleEye(inputId, btn) {
+  const inp = el(inputId);
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
+let toastT;
+function showToast(msg) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('on'), 3200);
+}
+</script>
+</body>
+</html>

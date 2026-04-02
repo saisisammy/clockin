@@ -7,2122 +7,1453 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EduTrack">
-<meta name="theme-color" content="#0b1120">
-<meta name="description" content="School Attendance System with Geofencing">
-<link rel="manifest" id="pwa-manifest">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="EduTrack">
 <meta name="application-name" content="EduTrack">
 <meta name="theme-color" content="#0fd4c0">
-<meta name="msapplication-TileColor" content="#0fd4c0">
+<meta name="description" content="Multi-School Attendance System with Geofencing">
+<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230fd4c0'/><text y='.9em' font-size='80' x='10'>🏫</text></svg>">
 <title>EduTrack · School Attendance</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, deleteDoc, onSnapshot, orderBy, Timestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-// ════════════════════════════════════════════════════
-// 🔥 FIREBASE CONFIG — Replace with your own config
-// Get it free at: https://console.firebase.google.com
-// ════════════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey: "AIzaSyDl0XxDhlF52VVk36i0DvrVLuFrGjwIdhE",
-  authDomain: "clock-in-records.firebaseapp.com",
-  projectId: "clock-in-records",
-  storageBucket: "clock-in-records.firebasestorage.app",
-  messagingSenderId: "643705157075",
-  appId: "1:643705157075:web:03d8def9668b6e8c24ab26",
-  measurementId: "G-3P8H51DQ0N"
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+const cfg = {
+  apiKey:"AIzaSyDl0XxDhlF52VVk36i0DvrVLuFrGjwIdhE",
+  authDomain:"clock-in-records.firebaseapp.com",
+  projectId:"clock-in-records",
+  storageBucket:"clock-in-records.firebasestorage.app",
+  messagingSenderId:"643705157075",
+  appId:"1:643705157075:web:03d8def9668b6e8c24ab26"
 };
-
-// ════════════════════════════════════════════════════
-// INIT FIREBASE
-// ════════════════════════════════════════════════════
-let app, db;
-let firebaseReady = false;
-
-try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  firebaseReady = true;
-} catch(e) {
-  console.warn('Firebase init failed — running in demo/local mode:', e.message);
-}
-
-// Expose to global scope
-window._firebase = { db, firebaseReady,
-  doc, getDoc, setDoc, addDoc, collection, query, where,
-  getDocs, deleteDoc, onSnapshot, orderBy, Timestamp };
-
-window.dispatchEvent(new Event('firebase-ready'));
+let db, ok=false;
+try { const app=initializeApp(cfg); db=getFirestore(app); ok=true; } catch(e){ console.warn('Firebase:',e.message); }
+window._fb = { db, ok, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where };
+window.dispatchEvent(new Event('fb-ready'));
 </script>
 
 <style>
-/* ═══════════════════════════════════════════
-   DESIGN SYSTEM — Warm Earthy + Electric Teal
-═══════════════════════════════════════════ */
-:root {
-  --bg:         #0b1120;
-  --bg2:        #111827;
-  --surface:    #1a2235;
-  --surface2:   #1f2a40;
-  --border:     #2a3650;
-  --border2:    #334166;
+/* ══════════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════════ */
+:root{
+  --bg:#0b1120; --bg2:#111827; --surf:#1a2235; --surf2:#1f2a40;
+  --bdr:#2a3650; --bdr2:#334166;
+  --teal:#0fd4c0; --teal-d:rgba(15,212,192,.12); --teal-g:rgba(15,212,192,.25);
+  --rose:#f43f5e; --rose-d:rgba(244,63,94,.12);
+  --amber:#f59e0b; --amber-d:rgba(245,158,11,.12);
+  --sky:#38bdf8; --violet:#8b5cf6;
+  --gold:#f59e0b; --gold-d:rgba(245,158,11,.15);
+  --tx:#e2e8f0; --tx2:#94a3b8; --tx3:#64748b;
+  --r1:8px; --r2:12px; --r3:16px; --r4:20px;
+  --sh:0 4px 24px rgba(0,0,0,.4); --sh-t:0 0 32px rgba(15,212,192,.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 40% at 15% 10%,rgba(15,212,192,.07) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 35% at 85% 80%,rgba(139,92,246,.06) 0%,transparent 60%)}
 
-  --teal:       #0fd4c0;
-  --teal-dim:   rgba(15,212,192,0.12);
-  --teal-glow:  rgba(15,212,192,0.25);
-  --amber:      #f59e0b;
-  --amber-dim:  rgba(245,158,11,0.12);
-  --rose:       #f43f5e;
-  --rose-dim:   rgba(244,63,94,0.12);
-  --sky:        #38bdf8;
-  --violet:     #8b5cf6;
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 var(--teal-g)}50%{opacity:.7;box-shadow:0 0 0 6px transparent}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes splashPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
 
-  --text:       #e2e8f0;
-  --text2:      #94a3b8;
-  --text3:      #64748b;
+/* ══════════════════════════════════════════════
+   Z-INDEX STACK (highest wins)
+   10000 = super admin login  ← TOP
+    9000 = admin login
+    8000 = school selector
+    7000 = splash
+    6000 = modals
+     200 = header / bottom-nav
+       5 = pages
+══════════════════════════════════════════════ */
 
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 20px;
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;z-index:7000;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spl-icon{width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:var(--sh-t);
+  animation:splashPop .5s cubic-bezier(.34,1.56,.64,1) both}
+.spl-name{font-size:26px;font-weight:800;animation:fadeUp .4s .15s ease both}
+.spl-sub{font-size:13px;color:var(--tx3);animation:fadeUp .4s .25s ease both}
+.spl-spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--bdr2);border-top-color:var(--teal);
+  animation:spin .8s linear infinite,fadeUp .4s .35s ease both}
+.spl-attr{position:absolute;bottom:28px;left:0;right:0;text-align:center;font-size:12px;color:var(--tx3);
+  animation:fadeUp .4s .5s ease both}
+.spl-attr strong{color:var(--teal);font-weight:700}
 
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-  --shadow-teal: 0 0 32px rgba(15,212,192,0.2);
-}
+/* ── SCHOOL SELECTOR ── */
+#school-sel{position:fixed;inset:0;z-index:8000;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+#school-sel.open{display:flex}
+.ssel-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--r4);
+  padding:28px;width:100%;max-width:420px;animation:popIn .35s cubic-bezier(.34,1.56,.64,1)}
+.ssel-logo{font-size:40px;text-align:center;margin-bottom:10px}
+.ssel-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+.ssel-sub{font-size:13px;color:var(--tx3);text-align:center;margin-bottom:20px}
+.school-list{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:16px}
+.school-opt{display:flex;align-items:center;gap:14px;padding:14px 16px;
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r3);
+  cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.school-opt:hover,.school-opt:active{border-color:var(--teal);background:var(--teal-d)}
+.school-opt-ic{width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:20px}
+.school-opt-name{font-size:15px;font-weight:700}
+.school-opt-id{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.ssel-divider{text-align:center;font-size:11px;color:var(--tx3);margin-bottom:10px;
+  display:flex;align-items:center;gap:10px}
+.ssel-divider::before,.ssel-divider::after{content:'';flex:1;border-top:1px solid var(--bdr)}
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── SUPER ADMIN LOGIN — highest z-index so nothing can cover it ── */
+#sa-login{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.75);
+  display:none;align-items:center;justify-content:center;padding:24px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#sa-login.open{display:flex}
+/* ── ADMIN LOGIN ── */
+#admin-login{position:fixed;inset:0;z-index:9000;background:var(--bg);
+  display:none;align-items:center;justify-content:center;padding:24px}
+#admin-login.open{display:flex}
+.login-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--r4);
+  padding:32px 28px;width:100%;max-width:380px;animation:popIn .35s cubic-bezier(.34,1.56,.64,1)}
+.login-icon{font-size:36px;text-align:center;margin-bottom:10px}
+.login-title{font-size:20px;font-weight:800;margin-bottom:4px;text-align:center}
+.login-sub{font-size:13px;color:var(--tx3);margin-bottom:22px;text-align:center;line-height:1.5}
+.login-err{font-size:12px;color:var(--rose);margin-bottom:10px;display:none}
 
-html { scroll-behavior: smooth; }
+/* ── MODALS ── */
+.modal-bg{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.65);
+  display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal-box{background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--r4);
+  padding:28px;width:100%;max-width:360px;animation:popIn .3s cubic-bezier(.34,1.56,.64,1)}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:8px}
+.modal-text{font-size:13px;color:var(--tx2);margin-bottom:20px;line-height:1.6}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
 
-body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Animated background */
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse 70% 40% at 15% 10%, rgba(15,212,192,0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 85% 80%, rgba(139,92,246,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(17,24,39,0) 0%, var(--bg) 100%);
-}
-
-@keyframes popIn {
-  from { opacity:0; transform:scale(0.92) translateY(12px); }
-  to   { opacity:1; transform:scale(1)    translateY(0); }
-}
-
-/* Splash loader shown while Firebase connects */
-#splash {
-  position: fixed; inset: 0; z-index: 1000;
-  background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-}
-.splash-logo-icon {
-  width: 72px; height: 72px; border-radius: 18px;
-  background: linear-gradient(135deg, var(--teal), var(--sky));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 34px; box-shadow: var(--shadow-teal);
-  animation: splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
-}
-@keyframes splashPop {
-  from { opacity:0; transform:scale(0.6); }
-  to   { opacity:1; transform:scale(1); }
-}
-.splash-name {
-  font-size: 26px; font-weight: 800; color: var(--text);
-  animation: fadeUp 0.4s 0.15s ease both;
-}
-.splash-sub {
-  font-size: 13px; color: var(--text3);
-  animation: fadeUp 0.4s 0.25s ease both;
-}
-.splash-spinner {
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 3px solid var(--border2);
-  border-top-color: var(--teal);
-  animation: spin 0.8s linear infinite, fadeUp 0.4s 0.35s ease both;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.splash-err {
-  font-size: 13px; color: var(--rose); text-align: center;
-  max-width: 280px; line-height: 1.6; display: none;
-  animation: fadeUp 0.3s ease both;
-}
-.splash-attr {
-  position: absolute; bottom: 28px; left: 0; right: 0;
-  text-align: center;
-  font-size: 12px; color: var(--text3);
-  animation: fadeUp 0.4s 0.5s ease both;
-  letter-spacing: 0.02em;
-}
-.splash-attr strong { color: var(--teal); font-weight: 700; }
+/* ── OFFLINE BAR ── */
+.offline-bar{background:var(--amber-d);border-bottom:1px solid rgba(245,158,11,.2);
+  padding:8px 16px;text-align:center;font-size:12px;color:#fcd34d;
+  display:none;position:relative;z-index:201}
+.offline-bar.show{display:block}
 
 /* ── HEADER ── */
-header {
-  position: sticky; top: 0; z-index: 200;
-  height: 60px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 20px;
-  background: rgba(11,17,32,0.85);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+header{position:sticky;top:0;z-index:200;height:60px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 20px;
+  background:rgba(11,17,32,.88);border-bottom:1px solid var(--bdr);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.h-logo{display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.h-logo-ic{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.h-logo-name{font-size:15px;font-weight:800}
+.h-school{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;
+  max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-right{display:flex;align-items:center;gap:8px}
+.h-clock{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--tx2);display:none}
+@media(min-width:420px){.h-clock{display:block}}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s ease-in-out infinite}
+.sync-dot.off{background:var(--rose);animation:none}
 
-.h-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.h-logo-icon {
-  width: 34px; height: 34px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--teal), var(--sky));
-  display: flex; align-items: center; justify-content: center; font-size: 16px;
-}
-.h-logo-name { font-size: 15px; font-weight: 800; color: var(--text); }
-.h-school { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.h-right { display: flex; align-items: center; gap: 8px; }
-.h-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); display: none; }
-@media(min-width:420px){ .h-clock { display: block; } }
-
-.sync-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--teal);
-  animation: pulse 2s ease-in-out infinite;
-}
-.sync-dot.offline { background: var(--rose); animation: none; }
-@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 var(--teal-glow);} 50%{opacity:0.7;box-shadow:0 0 0 6px transparent;} }
-
-/* ── BOTTOM NAV (mobile) ── */
-.bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
-  height: 64px;
-  display: flex; align-items: stretch;
-  background: rgba(26,34,53,0.96);
-  border-top: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-.bn-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; border: none; background: transparent;
-  color: var(--text3); font-size: 10px; font-weight: 600;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent;
-}
-.bn-btn .bn-icon { font-size: 20px; transition: transform 0.2s; }
-.bn-btn.active { color: var(--teal); }
-.bn-btn.active .bn-icon { transform: translateY(-2px); }
-
-/* ── ATTRIBUTION ── */
-.attribution {
-  text-align: center;
-  padding: 10px 16px 6px;
-  font-size: 11px;
-  color: var(--text3);
-  letter-spacing: 0.02em;
-  position: relative; z-index: 5;
-}
-.attribution strong { color: var(--teal); font-weight: 700; }
-
-/* ── RESPONSIVE IMPROVEMENTS ── */
-@media (max-width: 360px) {
-  .clock-btns { grid-template-columns: 1fr; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  .f-grid2 { grid-template-columns: 1fr; }
-  .report-controls { flex-direction: column; }
-  .report-controls .f-select { width: 100%; }
-}
-@media (max-width: 480px) {
-  header { padding: 0 14px; }
-  .page { padding: 14px 12px 80px; }
-  .zone-hero-top { padding: 12px 14px; }
-  .picker-card { padding: 14px; }
-  .a-card-body { padding: 14px; }
-  .clock-btn { padding: 16px 10px; font-size: 15px; }
-  .session-timer-val { font-size: 26px; }
-  .h-logo-name { font-size: 14px; }
-  .report-controls { gap: 6px; }
-}
-@media (hover: none) {
-  .clock-btn.can-in:hover, .clock-btn.can-out:hover { transform: none; }
-  .btn:hover { opacity: 1; }
-}
+/* ── BOTTOM NAV ── */
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:200;height:64px;
+  display:flex;align-items:stretch;
+  background:rgba(26,34,53,.96);border-top:1px solid var(--bdr);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;border:none;background:transparent;color:var(--tx3);
+  font-size:10px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.bn .bni{font-size:20px;transition:transform .2s}
+.bn.on{color:var(--teal)}
+.bn.on .bni{transform:translateY(-2px)}
+.bn.sa-on{color:var(--gold)!important}
 
 /* ── PAGES ── */
-.page { display: none; padding: 20px 16px 84px; position: relative; z-index: 5; min-height: calc(100vh - 60px); }
-.page.active { display: block; }
+.page{display:none;padding:20px 16px 84px;position:relative;z-index:5;min-height:calc(100vh - 60px)}
+.page.on{display:block}
 
 /* ── CLOCK PAGE ── */
-.zone-hero {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  margin-bottom: 16px;
-  position: relative;
-}
-.zone-hero-top {
-  padding: 16px 18px;
-  display: flex; align-items: center; justify-content: space-between;
-}
-.zone-hero-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); }
-.zone-status {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px; border-radius: 100px;
-  font-size: 12px; font-weight: 700;
-  background: var(--rose-dim); color: var(--rose); border: 1px solid rgba(244,63,94,0.25);
-  transition: all 0.4s;
-}
-.zone-status.inside { background: var(--teal-dim); color: var(--teal); border-color: rgba(15,212,192,0.3); }
-.zone-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.5s infinite; }
-@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.zone-hero{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);overflow:hidden;margin-bottom:16px}
+.zone-top{padding:16px 18px;display:flex;align-items:center;justify-content:space-between}
+.zone-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3)}
+.zone-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;
+  font-size:12px;font-weight:700;background:var(--rose-d);color:var(--rose);
+  border:1px solid rgba(244,63,94,.25);transition:all .4s}
+.zone-pill.in{background:var(--teal-d);color:var(--teal);border-color:rgba(15,212,192,.3)}
+.zone-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.5s infinite}
+#map-cv{width:100%;height:240px;display:block}
+.zone-foot{padding:10px 18px;display:flex;justify-content:space-between;border-top:1px solid var(--bdr)}
+.zone-coord{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx3)}
 
-#map-canvas { width: 100%; height: 240px; display: block; }
+/* teacher picker */
+.picker-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);padding:18px;margin-bottom:16px}
+.pick-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);margin-bottom:12px}
+.sel-chip{display:none;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r2);margin-bottom:12px}
+.sel-chip.on{display:flex}
+.chip-ava{width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--sky),var(--teal));
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff}
+.chip-info{flex:1;min-width:0}
+.chip-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip-tsc{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.chip-x{background:none;border:none;color:var(--tx3);font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+/* remember */
+.rem-row{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;background:var(--surf2);border:2px solid var(--bdr2);
+  border-radius:var(--r3);margin:14px 0 4px;cursor:pointer;transition:border-color .25s,background .25s;
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;width:100%}
+.rem-row.on{border-color:var(--teal);background:linear-gradient(135deg,rgba(15,212,192,.1),rgba(56,189,248,.06))}
+.rem-row-l{display:flex;align-items:center;gap:12px}
+.rem-ic{font-size:22px;flex-shrink:0;line-height:1}
+.rem-txt{font-size:14px;color:var(--tx);font-weight:700;line-height:1.2}
+.rem-sub{font-size:12px;color:var(--tx3);margin-top:3px;font-weight:400}
+.tog{width:52px;height:30px;border-radius:15px;flex-shrink:0;background:var(--bdr2);
+  position:relative;transition:background .3s;box-shadow:inset 0 1px 3px rgba(0,0,0,.3)}
+.tog.on{background:var(--teal)}
+.tog-k{position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:#fff;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.tog.on .tog-k{transform:translateX(22px)}
+/* remembered banner */
+.rem-banner{display:none;align-items:center;gap:10px;padding:10px 14px;
+  background:linear-gradient(135deg,rgba(15,212,192,.1),rgba(56,189,248,.07));
+  border:1px solid rgba(15,212,192,.25);border-radius:var(--r2);margin-bottom:10px}
+.rem-banner.on{display:flex}
+.rb-ava{width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#0b1120}
+.rb-info{flex:1;min-width:0}
+.rb-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-hint{font-size:11px;color:var(--tx3);margin-top:1px}
+.rb-sw{background:none;border:1px solid var(--bdr);border-radius:6px;
+  padding:5px 10px;color:var(--tx3);font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;flex-shrink:0}
+.rb-sw:hover{border-color:var(--teal);color:var(--teal)}
+/* search */
+.srch-wrap{position:relative;margin-bottom:4px}
+.srch-in{width:100%;padding:12px 14px 12px 40px;background:var(--bg2);border:1px solid var(--bdr);
+  border-radius:var(--r2);color:var(--tx);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;
+  outline:none;transition:border-color .2s;-webkit-appearance:none}
+.srch-in:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-d)}
+.srch-ic{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none}
+.t-dd{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;
+  background:var(--surf2);border:1px solid var(--bdr2);border-radius:var(--r2);
+  max-height:220px;overflow-y:auto;display:none;box-shadow:var(--sh)}
+.t-dd.open{display:block}
+.t-item{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;
+  transition:background .15s;border-bottom:1px solid var(--bdr)}
+.t-item:last-child{border-bottom:none}
+.t-item:hover,.t-item:active{background:var(--teal-d)}
+.t-ava{width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--sky),var(--violet));
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.t-nm{font-size:14px;font-weight:600}
+.t-ts{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace}
+/* clock btns */
+.ck-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+.ck-btn{padding:20px 12px;border-radius:var(--r3);border:2px solid var(--bdr);
+  background:var(--bg2);color:var(--tx3);font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:17px;font-weight:800;cursor:not-allowed;transition:all .25s;text-align:center;line-height:1;
+  -webkit-tap-highlight-color:transparent}
+.ck-btn .sub{display:block;font-size:10px;font-weight:500;margin-top:5px;color:var(--tx3)}
+.ck-btn.can-in{background:linear-gradient(135deg,rgba(15,212,192,.15),rgba(56,189,248,.1));
+  border-color:var(--teal);color:var(--teal);cursor:pointer;box-shadow:0 4px 20px rgba(15,212,192,.2)}
+.ck-btn.can-out{background:linear-gradient(135deg,rgba(244,63,94,.15),rgba(245,158,11,.1));
+  border-color:var(--rose);color:var(--rose);cursor:pointer;box-shadow:0 4px 20px rgba(244,63,94,.2)}
+.ck-btn.can-in:active,.ck-btn.can-out:active{transform:scale(.97)}
+/* session banner */
+.sess-bn{display:none;background:linear-gradient(135deg,var(--teal-d),rgba(56,189,248,.08));
+  border:1px solid rgba(15,212,192,.25);border-radius:var(--r3);padding:16px;text-align:center;margin-top:14px}
+.sess-bn.on{display:block}
+.sess-val{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:600;color:var(--teal)}
+.sess-lbl{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;margin-top:4px}
+.sess-who{font-size:13px;color:var(--tx2);margin-top:6px;font-weight:600}
+/* log */
+.sec-title{font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.log-list{display:flex;flex-direction:column;gap:8px}
+.log-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r2);
+  padding:12px 14px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s ease}
+.lc-ava{width:38px;height:38px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.lc-ava.in{background:linear-gradient(135deg,var(--teal),var(--sky))}
+.lc-ava.out{background:linear-gradient(135deg,var(--rose),var(--amber))}
+.lc-info{flex:1;min-width:0}
+.lc-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-time{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.log-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;flex-shrink:0}
+.log-badge.in{background:var(--teal-d);color:var(--teal);border:1px solid rgba(15,212,192,.2)}
+.log-badge.out{background:var(--rose-d);color:var(--rose);border:1px solid rgba(244,63,94,.2)}
+/* geo err */
+.geo-err{display:none;padding:10px 14px;border-radius:var(--r1);background:var(--rose-d);
+  border:1px solid rgba(244,63,94,.3);color:#fca5a5;font-size:12px;margin-bottom:12px;line-height:1.5}
+.geo-err.on{display:block}
 
-.zone-footer {
-  padding: 10px 18px;
-  display: flex; justify-content: space-between;
-  border-top: 1px solid var(--border);
-}
-.zone-coord { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); }
+/* ══════════════════════════════════════════════
+   ADMIN PAGE
+══════════════════════════════════════════════ */
+.a-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:20px;padding-bottom:2px}
+.a-tabs::-webkit-scrollbar{display:none}
+.a-tab{flex-shrink:0;padding:8px 16px;border-radius:100px;border:1px solid var(--bdr);background:var(--surf);
+  color:var(--tx3);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.a-tab.on{background:var(--teal-d);border-color:var(--teal);color:var(--teal)}
+.a-sec{display:none}
+.a-sec.on{display:block}
+/* cards */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.card-ttl{font-size:13px;font-weight:700;color:var(--tx2)}
+.card-body{padding:18px}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:480px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat-p{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r3);padding:14px;text-align:center}
+.stat-n{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:600;color:var(--teal)}
+.stat-l{font-size:11px;color:var(--tx3);margin-top:4px}
+/* forms */
+.f-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);margin-bottom:6px}
+.f-in{width:100%;padding:12px 14px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r2);
+  color:var(--tx);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;outline:none;transition:all .2s;-webkit-appearance:none}
+.f-in:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-d)}
+.f-row{margin-bottom:14px}
+.f-g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f-sel{width:100%;padding:10px 14px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r2);
+  color:var(--tx);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;outline:none;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+.f-sel:focus{border-color:var(--teal)}
+/* btns */
+.btn{padding:11px 20px;border-radius:var(--r2);border:none;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.btn-t{background:var(--teal);color:#0b1120}
+.btn-t:hover{opacity:.88}
+.btn-t:active{transform:scale(.97)}
+.btn-g{background:var(--gold);color:#0b1120}
+.btn-g:hover{opacity:.88}
+.btn-g:active{transform:scale(.97)}
+.btn-gh{background:var(--surf2);border:1px solid var(--bdr);color:var(--tx2)}
+.btn-gh:hover{border-color:var(--teal);color:var(--teal)}
+.btn-d{background:var(--rose-d);border:1px solid rgba(244,63,94,.3);color:var(--rose)}
+.btn-d:hover{background:rgba(244,63,94,.2)}
+.btn-sm{padding:7px 14px;font-size:13px}
+.btn-full{width:100%}
+/* teacher list */
+.t-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--bdr)}
+.t-row:last-child{border-bottom:none}
+.t-av{width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--sky),var(--violet));
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff}
+.t-nme{font-size:15px;font-weight:700}
+.t-met{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+/* report table */
+.rpt-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.rpt-tbl th{padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--tx3);border-bottom:1px solid var(--bdr);white-space:nowrap}
+.rpt-tbl td{padding:11px 12px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+.rpt-tbl tr:last-child td{border-bottom:none}
+.rpt-tbl tr:hover td{background:rgba(255,255,255,.02)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tsc-b{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 7px;border-radius:4px;
+  background:rgba(139,92,246,.12);color:var(--violet);border:1px solid rgba(139,92,246,.2)}
+.unr-b{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 7px;border-radius:4px;
+  background:rgba(100,116,139,.12);color:var(--tx3)}
+.in-b{font-size:11px;padding:3px 8px;border-radius:4px;font-weight:700;background:var(--teal-d);color:var(--teal)}
+.out-b{font-size:11px;padding:3px 8px;border-radius:4px;font-weight:700;background:var(--rose-d);color:var(--rose)}
+/* ind bars */
+.ind-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ind-lbl{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);width:80px;flex-shrink:0}
+.ind-wrap{flex:1;height:16px;background:var(--bdr);border-radius:100px;overflow:hidden}
+.ind-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--sky),var(--teal));
+  transition:width .6s cubic-bezier(.34,1.56,.64,1)}
+.ind-cnt{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tx3);width:24px;text-align:right}
+/* report controls */
+.rpt-ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 
-/* Teacher picker */
-.picker-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: 18px;
-  margin-bottom: 16px;
-}
-.picker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 12px; }
+/* ══════════════════════════════════════════════
+   SUPER ADMIN PAGE
+══════════════════════════════════════════════ */
+.sa-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;
+  background:var(--gold-d);border:1px solid rgba(245,158,11,.3);
+  border-radius:100px;font-size:11px;font-weight:700;color:var(--gold);margin-bottom:16px}
+.sa-school-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r4);
+  padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease}
+.sa-sc-ic{width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--teal),var(--sky));
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+.sa-sc-info{flex:1;min-width:0}
+.sa-sc-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-sc-meta{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.sa-sc-btns{display:flex;gap:6px;flex-shrink:0}
 
-.selected-chip {
-  display: none; align-items: center; gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: var(--r-md);
-  margin-bottom: 12px;
-}
-.selected-chip.visible { display: flex; }
-.chip-ava {
-  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sky), var(--teal));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 800; color: #fff;
-}
-.chip-info { flex: 1; min-width: 0; }
-.chip-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chip-tsc { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
-.chip-clear { background: none; border: none; color: var(--text3); font-size: 20px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+/* ── TOAST ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--surf2);border:1px solid var(--bdr2);border-radius:100px;
+  padding:11px 22px;font-size:13px;font-weight:600;z-index:9999;
+  opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  white-space:nowrap;max-width:calc(100vw - 40px);box-shadow:var(--sh)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* Remember Me toggle */
-.remember-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--surface2);
-  border: 2px solid var(--border2);
-  border-radius: var(--r-lg);
-  margin: 14px 0 4px;
-  cursor: pointer;
-  transition: border-color 0.25s, background 0.25s;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none; -webkit-user-select: none;
-  /* Always take full width, never hidden by overflow */
-  width: 100%; box-sizing: border-box;
-}
-.remember-row.on {
-  border-color: var(--teal);
-  background: linear-gradient(135deg, rgba(15,212,192,0.1), rgba(56,189,248,0.06));
-}
-.remember-row:active { opacity: 0.85; }
-.remember-row-left { display: flex; align-items: center; gap: 12px; }
-.remember-row-icon {
-  font-size: 22px; flex-shrink: 0; line-height: 1;
-}
-.remember-row-text { font-size: 14px; color: var(--text); font-weight: 700; line-height: 1.2; }
-.remember-row-sub  { font-size: 12px; color: var(--text3); margin-top: 3px; font-weight: 400; }
-.toggle-switch {
-  width: 52px; height: 30px; border-radius: 15px; flex-shrink: 0;
-  background: var(--border2); position: relative;
-  transition: background 0.3s;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
-}
-.toggle-switch.on { background: var(--teal); }
-.toggle-knob {
-  position: absolute; top: 4px; left: 4px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: #fff; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-}
-.toggle-switch.on .toggle-knob { transform: translateX(22px); }
+/* ── PWA BANNER ── */
+.pwa-banner{display:none;position:fixed;bottom:72px;left:12px;right:12px;z-index:300;
+  background:var(--surf2);border:1px solid var(--bdr2);border-radius:var(--r3);
+  padding:14px 16px;box-shadow:var(--sh);animation:fadeUp .3s ease;align-items:center;gap:12px}
+.pwa-banner.on{display:flex}
+.pwa-b-txt{flex:1}
+.pwa-b-ttl{font-size:14px;font-weight:700}
+.pwa-b-sub{font-size:12px;color:var(--tx3);margin-top:2px}
+.pwa-b-btns{display:flex;gap:6px;flex-shrink:0}
 
-/* Remembered-name banner */
-.remembered-banner {
-  display: none; align-items: center; gap: 10px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, rgba(15,212,192,0.1), rgba(56,189,248,0.07));
-  border: 1px solid rgba(15,212,192,0.25);
-  border-radius: var(--r-md); margin-bottom: 10px;
-  animation: fadeUp 0.3s ease;
-}
-.remembered-banner.show { display: flex; }
-.rb-ava {
-  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--teal), var(--sky));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800; color: #0b1120;
-}
-.rb-info { flex: 1; min-width: 0; }
-.rb-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rb-hint { font-size: 11px; color: var(--text3); margin-top: 1px; }
-.rb-change { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text3); font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
-.rb-change:hover { border-color: var(--teal); color: var(--teal); }
+/* ── ATTRIBUTION ── */
+.attr{text-align:center;padding:10px 16px 6px;font-size:11px;color:var(--tx3);
+  letter-spacing:.02em;position:relative;z-index:5}
+.attr span{color:var(--teal);font-weight:700}
 
-.search-wrap { position: relative; margin-bottom: 4px; }
-.search-input {
-  width: 100%; padding: 12px 14px 12px 40px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-md); color: var(--text);
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px;
-  outline: none; transition: border-color 0.2s;
-  -webkit-appearance: none;
-}
-.search-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
-.search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 16px; pointer-events: none; }
+/* ── EMPTY ── */
+.empty{text-align:center;padding:32px 16px}
+.empty-ic{font-size:36px;margin-bottom:8px}
+.empty-tx{font-size:14px;color:var(--tx3)}
 
-.t-dropdown {
-  position: absolute; top: calc(100%+4px); left: 0; right: 0; z-index: 50;
-  background: var(--surface2); border: 1px solid var(--border2);
-  border-radius: var(--r-md); max-height: 220px; overflow-y: auto; display: none;
-  box-shadow: var(--shadow);
-}
-.t-dropdown.open { display: block; }
-.t-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; cursor: pointer; transition: background 0.15s;
-  border-bottom: 1px solid var(--border);
-}
-.t-item:last-child { border-bottom: none; }
-.t-item:hover, .t-item:active { background: var(--teal-dim); }
-.t-item-ava {
-  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sky), var(--violet));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; color: #fff;
-}
-.t-item-name { font-size: 14px; font-weight: 600; }
-.t-item-tsc { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
 
-/* Clock buttons */
-.clock-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
-.clock-btn {
-  padding: 20px 12px;
-  border-radius: var(--r-lg); border: 2px solid var(--border);
-  background: var(--bg2); color: var(--text3);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 17px; font-weight: 800;
-  cursor: not-allowed; transition: all 0.25s;
-  text-align: center; line-height: 1;
-  -webkit-tap-highlight-color: transparent;
+/* ── RESPONSIVE ── */
+@media(max-width:360px){
+  .ck-btns{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .f-g2{grid-template-columns:1fr}
+  .rpt-ctrl{flex-direction:column}
 }
-.clock-btn .cb-sub { display: block; font-size: 10px; font-weight: 500; margin-top: 5px; color: var(--text3); }
-.clock-btn.can-in {
-  background: linear-gradient(135deg, rgba(15,212,192,0.15), rgba(56,189,248,0.1));
-  border-color: var(--teal); color: var(--teal);
-  cursor: pointer; box-shadow: 0 4px 20px rgba(15,212,192,0.2);
+@media(max-width:480px){
+  header{padding:0 14px}
+  .page{padding:14px 12px 80px}
+  .ck-btn{padding:16px 10px;font-size:15px}
+  .sess-val{font-size:26px}
 }
-.clock-btn.can-out {
-  background: linear-gradient(135deg, rgba(244,63,94,0.15), rgba(245,158,11,0.1));
-  border-color: var(--rose); color: var(--rose);
-  cursor: pointer; box-shadow: 0 4px 20px rgba(244,63,94,0.2);
+@media(hover:none){
+  .ck-btn.can-in:hover,.ck-btn.can-out:hover{transform:none}
+  .btn:hover{opacity:1}
 }
-.clock-btn.can-in:active { transform: scale(0.97); }
-.clock-btn.can-out:active { transform: scale(0.97); }
+@media(min-width:768px){
+  .page{max-width:680px;margin:0 auto}
+  .ck-btns{gap:16px}
+  .ck-btn{padding:24px 16px;font-size:18px}
+}
+@media(min-width:1024px){.page{max-width:860px}}
 
-/* Session timer */
-.session-banner {
-  display: none;
-  background: linear-gradient(135deg, var(--teal-dim), rgba(56,189,248,0.08));
-  border: 1px solid rgba(15,212,192,0.25);
-  border-radius: var(--r-lg);
-  padding: 16px;
-  text-align: center;
-  margin-top: 14px;
-  animation: fadeUp 0.3s ease;
-}
-.session-banner.active { display: block; }
-.session-timer-val { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; color: var(--teal); }
-.session-timer-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
-.session-timer-who { font-size: 13px; color: var(--text2); margin-top: 6px; font-weight: 600; }
-
-/* Today log */
-.section-title { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.log-list { display: flex; flex-direction: column; gap: 8px; }
-.log-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 12px 14px;
-  display: flex; align-items: center; gap: 12px;
-  animation: fadeUp 0.3s ease;
-}
-@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-.log-card-ava {
-  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800; color: #fff;
-}
-.log-card-ava.in  { background: linear-gradient(135deg, var(--teal), var(--sky)); }
-.log-card-ava.out { background: linear-gradient(135deg, var(--rose), var(--amber)); }
-.log-info { flex: 1; min-width: 0; }
-.log-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.log-time { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
-.log-badge {
-  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
-}
-.log-badge.in  { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(15,212,192,0.2); }
-.log-badge.out { background: var(--rose-dim); color: var(--rose); border: 1px solid rgba(244,63,94,0.2); }
-
-/* Geo error */
-.geo-err {
-  display: none; padding: 10px 14px; border-radius: var(--r-sm);
-  background: var(--rose-dim); border: 1px solid rgba(244,63,94,0.3);
-  color: #fca5a5; font-size: 12px; margin-bottom: 12px; line-height: 1.5;
-}
-.geo-err.show { display: block; }
-
-/* ── ADMIN PAGE ── */
-.admin-tabs {
-  display: flex; gap: 6px; overflow-x: auto;
-  scrollbar-width: none; margin-bottom: 20px;
-}
-.admin-tabs::-webkit-scrollbar { display: none; }
-.a-tab {
-  flex-shrink: 0; padding: 8px 16px; border-radius: 100px;
-  border: 1px solid var(--border); background: var(--surface);
-  color: var(--text3); font-size: 13px; font-weight: 700;
-  cursor: pointer; transition: all 0.2s; white-space: nowrap;
-}
-.a-tab.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
-
-.a-section { display: none; }
-.a-section.active { display: block; }
-
-/* Cards */
-.a-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-.a-card-head {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.a-card-title { font-size: 13px; font-weight: 700; color: var(--text2); }
-.a-card-body { padding: 18px; }
-
-/* Stats row */
-.stats-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 16px; }
-@media(min-width:480px){ .stats-row { grid-template-columns: repeat(4,1fr); } }
-.stat-pill {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 14px;
-  text-align: center;
-}
-.stat-num { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 600; color: var(--teal); }
-.stat-lbl { font-size: 11px; color: var(--text3); margin-top: 4px; }
-
-/* Form */
-.f-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 6px; }
-.f-input {
-  width: 100%; padding: 12px 14px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-md); color: var(--text);
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px;
-  outline: none; transition: all 0.2s; -webkit-appearance: none;
-}
-.f-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
-.f-row { margin-bottom: 14px; }
-.f-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-/* Buttons */
-.btn { padding: 11px 20px; border-radius: var(--r-md); border: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
-.btn-teal { background: var(--teal); color: #0b1120; }
-.btn-teal:hover { opacity: 0.88; }
-.btn-teal:active { transform: scale(0.97); }
-.btn-ghost { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); }
-.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
-.btn-danger { background: var(--rose-dim); border: 1px solid rgba(244,63,94,0.3); color: var(--rose); }
-.btn-danger:hover { background: rgba(244,63,94,0.2); }
-.btn-sm { padding: 7px 14px; font-size: 13px; }
-.btn-full { width: 100%; }
-
-/* Teacher list */
-.teacher-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--border);
-}
-.teacher-item:last-child { border-bottom: none; }
-.t-ava {
-  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sky), var(--violet));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 800; color: #fff;
-}
-.t-name { font-size: 15px; font-weight: 700; }
-.t-meta { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
-.t-sessions { font-size: 12px; color: var(--text3); margin-left: auto; margin-right: 10px; white-space: nowrap; }
-
-/* Report table */
-.report-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.report-tbl th { padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
-.report-tbl td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.report-tbl tr:last-child td { border-bottom: none; }
-.report-tbl tr:hover td { background: rgba(255,255,255,0.02); }
-.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-/* Badges */
-.tsc-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 7px; border-radius: 4px; background: rgba(139,92,246,0.12); color: var(--violet); border: 1px solid rgba(139,92,246,0.2); }
-.unr-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 7px; border-radius: 4px; background: rgba(100,116,139,0.12); color: var(--text3); }
-.in-badge  { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; background: var(--teal-dim); color: var(--teal); }
-.out-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700; background: var(--rose-dim); color: var(--rose); }
-
-/* Individual stats */
-.ind-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.ind-bar-lbl { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text3); width: 80px; flex-shrink: 0; }
-.ind-bar-wrap { flex: 1; height: 16px; background: var(--border); border-radius: 100px; overflow: hidden; }
-.ind-bar-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--sky), var(--teal)); transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
-.ind-bar-count { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--text3); width: 24px; text-align: right; }
-
-/* Toast */
-.toast {
-  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(10px);
-  background: var(--surface2); border: 1px solid var(--border2);
-  border-radius: 100px; padding: 11px 22px;
-  font-size: 13px; font-weight: 600;
-  z-index: 9999; opacity: 0; pointer-events: none;
-  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
-  white-space: nowrap; max-width: calc(100vw - 40px);
-  box-shadow: var(--shadow);
-}
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* Modal */
-.modal-bg {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(0,0,0,0.65);
-  display: none; align-items: center; justify-content: center;
-  padding: 20px;
-  backdrop-filter: blur(4px);
-}
-.modal-bg.open { display: flex; }
-.modal-box {
-  background: var(--surface); border: 1px solid var(--border2);
-  border-radius: var(--r-xl); padding: 28px;
-  width: 100%; max-width: 360px;
-  animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-}
-.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
-.modal-text { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.6; }
-.modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
-
-/* Login */
-.login-full {
-  position: fixed; inset: 0; z-index: 400;
-  background: var(--bg); display: none; align-items: center; justify-content: center; padding: 24px;
-}
-.login-full.show { display: flex; }
-.login-box {
-  background: var(--surface); border: 1px solid var(--border2);
-  border-radius: var(--r-xl); padding: 32px 28px;
-  width: 100%; max-width: 380px;
-  animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
-}
-.login-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
-.login-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
-.login-err { font-size: 12px; color: var(--rose); margin-bottom: 10px; display: none; }
-
-/* Empty */
-.empty { text-align: center; padding: 32px 16px; }
-.empty-icon { font-size: 36px; margin-bottom: 8px; }
-.empty-text { font-size: 14px; color: var(--text3); }
-
-/* Offline banner */
-.offline-bar {
-  background: var(--amber-dim); border-bottom: 1px solid rgba(245,158,11,0.2);
-  padding: 8px 16px; text-align: center; font-size: 12px; color: #fcd34d;
-  display: none; position: relative; z-index: 6;
-}
-.offline-bar.show { display: block; }
-
-/* Select */
-.f-select {
-  width: 100%; padding: 10px 14px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-md); color: var(--text);
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px;
-  outline: none; -webkit-appearance: none; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 14px center;
-  padding-right: 36px;
-}
-.f-select:focus { border-color: var(--teal); }
-
-/* Report controls */
-.report-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* Attribution */
-.attribution {
-  text-align: center;
-  padding: 10px 16px 6px;
-  font-size: 11px;
-  color: var(--text3);
-  letter-spacing: 0.02em;
-  position: relative; z-index: 5;
-}
-.attribution span { color: var(--teal); font-weight: 700; }
-
-/* PWA install banner */
-/* iOS install sheet uses .modal-bg / .modal-box styles already defined */
-
-.pwa-banner {
-  display: none;
-  position: fixed; bottom: 72px; left: 12px; right: 12px; z-index: 300;
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
-  animation: fadeUp 0.3s ease;
-  align-items: center; gap: 12px;
-}
-.pwa-banner.show { display: flex; }
-.pwa-banner-icon { font-size: 28px; flex-shrink: 0; }
-.pwa-banner-text { flex: 1; }
-.pwa-banner-title { font-size: 14px; font-weight: 700; }
-.pwa-banner-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
-.pwa-banner-btns { display: flex; gap: 6px; flex-shrink: 0; }
-
-/* Responsive improvements */
-@media (max-width: 360px) {
-  .clock-btns { grid-template-columns: 1fr; }
-  .clock-btn { padding: 16px 12px; font-size: 15px; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  header { padding: 0 12px; }
-  .page { padding: 14px 12px 84px; }
-}
-@media (min-width: 768px) {
-  .page { max-width: 680px; margin: 0 auto; }
-  .clock-btns { gap: 16px; }
-  .clock-btn { padding: 24px 16px; font-size: 18px; }
-}
-@media (min-width: 1024px) {
-  .page { max-width: 860px; }
-}
+/* pin input wrapper */
+.pin-wrap{position:relative}
+.pin-wrap .f-in{padding-right:44px}
+.pin-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--tx3);cursor:pointer;font-size:16px;padding:4px}
 </style>
 </head>
 <body>
 
-<!-- ══ SPLASH LOADER ══ -->
+<!-- ══ SPLASH ══ -->
 <div id="splash">
-  <div class="splash-logo-icon">🏫</div>
-  <div class="splash-name">EduTrack</div>
-  <div class="splash-sub">School Attendance System</div>
-  <div class="splash-spinner" id="splash-spinner"></div>
-  <div class="splash-err" id="splash-err"></div>
-  <div class="splash-attr">Powered by <strong>Mr. Saisi Nyongesa Sammy</strong></div>
+  <div class="spl-icon">🏫</div>
+  <div class="spl-name">EduTrack</div>
+  <div class="spl-sub">Multi-School Attendance System</div>
+  <div class="spl-spin"></div>
+  <div class="spl-attr">Powered by <strong>Mr. Saisi Nyongesa Sammy</strong></div>
 </div>
 
-<!-- ══ OFFLINE BANNER ══ -->
-<div class="offline-bar" id="offline-bar">⚠️ No cloud connection — changes saved locally only</div>
+<!-- ══ SCHOOL SELECTOR ══ -->
+<div id="school-sel">
+  <div class="ssel-box">
+    <div class="ssel-logo">🏫</div>
+    <div class="ssel-title">Select Your School</div>
+    <div class="ssel-sub">Tap your school to continue</div>
+    <div class="school-list" id="school-list">
+      <div class="empty"><div class="empty-ic">⏳</div><div class="empty-tx">Loading schools…</div></div>
+    </div>
+    <div class="ssel-divider">Super Admin?</div>
+    <a href="superadmin.html" class="btn btn-g btn-full" style="display:block;text-align:center;text-decoration:none">⭐ Super Admin Panel</a>
+  </div>
+</div>
+
+<!-- Super Admin is now a separate page: superadmin.html -->
+
+<!-- ══ ADMIN LOGIN ══ -->
+<div id="admin-login">
+  <div class="login-box">
+    <div class="login-icon">🛡</div>
+    <div class="login-title">Admin Dashboard</div>
+    <div class="login-sub" id="admin-login-sub">Enter the admin PIN for this school</div>
+    <div class="f-row">
+      <label class="f-lbl">PIN</label>
+      <div class="pin-wrap">
+        <input type="password" class="f-in" id="admin-pin" placeholder="••••" maxlength="8"
+          onkeydown="if(event.key==='Enter')doAdminLogin()">
+        <button class="pin-eye" onclick="toggleEye('admin-pin',this)">👁</button>
+      </div>
+    </div>
+    <div class="login-err" id="admin-err">Incorrect PIN. Try again.</div>
+    <button class="btn btn-t btn-full" onclick="doAdminLogin()" style="margin-bottom:10px">Enter Dashboard</button>
+    <button class="btn btn-gh btn-full" onclick="closeAdminLogin()">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ OFFLINE BAR ══ -->
+<div class="offline-bar" id="offline-bar">⚠️ No cloud connection — data may be outdated</div>
 
 <!-- ══ HEADER ══ -->
 <header>
-  <div class="h-logo">
-    <div class="h-logo-icon">🏫</div>
+  <div class="h-logo" onclick="goSwitchSchool()" title="Switch school">
+    <div class="h-logo-ic">🏫</div>
     <div>
       <div class="h-logo-name">EduTrack</div>
-      <div class="h-school" id="h-school-name">Loading…</div>
+      <div class="h-school" id="h-school">Select school…</div>
     </div>
   </div>
   <div class="h-right">
     <div class="h-clock" id="h-clock">--:--:--</div>
-    <div class="sync-dot" id="sync-dot" title="Cloud sync status"></div>
+    <div class="sync-dot" id="sync-dot" title="Cloud sync"></div>
   </div>
 </header>
 
 <!-- ══ CLOCK PAGE ══ -->
-<div class="page active" id="page-clock">
-
+<div class="page on" id="page-clock">
   <div class="geo-err" id="geo-err"></div>
-
-  <!-- Zone map -->
   <div class="zone-hero">
-    <div class="zone-hero-top">
-      <span class="zone-hero-label">📍 School Zone</span>
-      <div class="zone-status" id="zone-status">
-        <div class="zone-status-dot"></div>
-        <span id="zone-status-txt">Outside Zone</span>
+    <div class="zone-top">
+      <span class="zone-lbl">📍 School Zone</span>
+      <div class="zone-pill" id="zone-pill">
+        <div class="zone-dot"></div>
+        <span id="zone-txt">Outside Zone</span>
       </div>
     </div>
-    <canvas id="map-canvas"></canvas>
-    <div class="zone-footer">
+    <canvas id="map-cv"></canvas>
+    <div class="zone-foot">
       <span class="zone-coord" id="coord-txt">Lat: — / Lng: —</span>
       <span class="zone-coord" id="dist-txt" style="color:var(--sky)">Distance: —</span>
     </div>
   </div>
 
-  <!-- Teacher picker -->
   <div class="picker-card">
-    <div class="picker-label">👤 Select Your Name</div>
-
-    <!-- Remembered teacher banner (shown when remember-me is on) -->
-    <div class="remembered-banner" id="remembered-banner">
+    <div class="pick-lbl" id="pick-lbl">👤 Select Your Name</div>
+    <div class="rem-banner" id="rem-banner">
       <div class="rb-ava" id="rb-ava">?</div>
       <div class="rb-info">
         <div class="rb-name" id="rb-name">—</div>
         <div class="rb-hint">Remembered on this device</div>
       </div>
-      <button class="rb-change" onclick="promptColleague()">Switch</button>
+      <button class="rb-sw" onclick="promptColleague()">Switch</button>
     </div>
-
-    <!-- Selected teacher chip -->
-    <div class="selected-chip" id="sel-chip">
-      <div class="chip-ava" id="sel-chip-ava">?</div>
+    <div class="sel-chip" id="sel-chip">
+      <div class="chip-ava" id="chip-ava">?</div>
       <div class="chip-info">
-        <div class="chip-name" id="sel-chip-name">—</div>
-        <div class="chip-tsc" id="sel-chip-tsc">—</div>
+        <div class="chip-name" id="chip-name">—</div>
+        <div class="chip-tsc" id="chip-tsc">—</div>
       </div>
-      <button class="chip-clear" onclick="clearTeacher()">✕</button>
+      <button class="chip-x" onclick="clearTeacher()">✕</button>
     </div>
-
-    <!-- Search/select -->
-    <div class="search-wrap" id="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" class="search-input" id="t-search" placeholder="Search your name…"
+    <div class="srch-wrap" id="srch-wrap">
+      <span class="srch-ic">🔍</span>
+      <input type="text" class="srch-in" id="t-srch" placeholder="Search your name…"
         autocomplete="off" oninput="filterTeachers(this.value)" onfocus="openDD()" onblur="schedClose()">
-      <div class="t-dropdown" id="t-dropdown"></div>
+      <div class="t-dd" id="t-dd"></div>
     </div>
-
-    <!-- Remember Me toggle — always rendered, visibility controlled by JS -->
-    <div class="remember-row" id="remember-row" onclick="toggleRememberMe()" style="display:none;" role="switch" aria-checked="false">
-      <div class="remember-row-left">
-        <div class="remember-row-icon" id="remember-icon">🔔</div>
+    <div class="rem-row" id="rem-row" onclick="toggleRemMe()" style="display:none" role="switch" aria-checked="false">
+      <div class="rem-row-l">
+        <div class="rem-ic" id="rem-ic">🔔</div>
         <div>
-          <div class="remember-row-text">Remember me</div>
-          <div class="remember-row-sub" id="remember-sub">Tap to save your name on this device</div>
+          <div class="rem-txt">Remember me</div>
+          <div class="rem-sub" id="rem-sub">Tap to save your name on this device</div>
         </div>
       </div>
-      <div class="toggle-switch" id="remember-toggle">
-        <div class="toggle-knob"></div>
-      </div>
+      <div class="tog" id="rem-tog"><div class="tog-k"></div></div>
     </div>
-
-    <div class="clock-btns">
-      <button class="clock-btn" id="btn-in" disabled onclick="doClockIn()">
-        🟢 CLOCK IN<span class="cb-sub" id="sub-in">select name first</span>
-      </button>
-      <button class="clock-btn" id="btn-out" disabled onclick="doClockOut(false)">
-        🔴 CLOCK OUT<span class="cb-sub" id="sub-out">select name first</span>
-      </button>
+    <div class="ck-btns">
+      <button class="ck-btn" id="btn-in" disabled onclick="doClockIn()">🟢 CLOCK IN<span class="sub" id="sub-in">select name first</span></button>
+      <button class="ck-btn" id="btn-out" disabled onclick="doClockOut(false)">🔴 CLOCK OUT<span class="sub" id="sub-out">select name first</span></button>
     </div>
-
-    <div class="session-banner" id="session-banner">
-      <div class="session-timer-val" id="session-val">00:00:00</div>
-      <div class="session-timer-label">Session Duration</div>
-      <div class="session-timer-who" id="session-who"></div>
+    <div class="sess-bn" id="sess-bn">
+      <div class="sess-val" id="sess-val">00:00:00</div>
+      <div class="sess-lbl">Session Duration</div>
+      <div class="sess-who" id="sess-who"></div>
     </div>
   </div>
 
-  <!-- Today's log -->
-  <div class="section-title">📋 Today's Activity <span style="font-size:11px;color:var(--text3);font-weight:500;" id="today-lbl"></span></div>
+  <div class="sec-title">📋 Today's Activity <span style="font-size:11px;color:var(--tx3);font-weight:500" id="today-lbl"></span></div>
   <div class="log-list" id="today-log">
-    <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet today</div></div>
+    <div class="empty"><div class="empty-ic">📭</div><div class="empty-tx">No records yet today</div></div>
   </div>
 </div>
 
 <!-- ══ ADMIN PAGE ══ -->
 <div class="page" id="page-admin">
-  <div class="admin-tabs">
-    <div class="a-tab active" onclick="aNav('overview','this')">Overview</div>
-    <div class="a-tab" onclick="aNav('teachers','this')">Teachers</div>
-    <div class="a-tab" onclick="aNav('reports','this')">Reports</div>
-    <div class="a-tab" onclick="aNav('individual','this')">Individual</div>
-    <div class="a-tab" onclick="aNav('settings','this')">Settings</div>
+  <div class="a-tabs" id="a-tabs">
+    <div class="a-tab on" onclick="aNav('overview',this)">Overview</div>
+    <div class="a-tab" onclick="aNav('teachers',this)">Teachers</div>
+    <div class="a-tab" onclick="aNav('reports',this)">Reports</div>
+    <div class="a-tab" onclick="aNav('individual',this)">Individual</div>
+    <div class="a-tab" onclick="aNav('settings',this)">Settings</div>
   </div>
 
-  <!-- OVERVIEW -->
-  <div class="a-section active" id="asec-overview">
-    <div class="stats-row" id="stats-row">
-      <div class="stat-pill"><div class="stat-num" id="stat-teachers">0</div><div class="stat-lbl">Teachers</div></div>
-      <div class="stat-pill"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">Today's Check-ins</div></div>
-      <div class="stat-pill"><div class="stat-num" id="stat-present">0</div><div class="stat-lbl">Currently In</div></div>
-      <div class="stat-pill"><div class="stat-num" id="stat-week">0</div><div class="stat-lbl">This Week</div></div>
+  <!-- overview -->
+  <div class="a-sec on" id="as-overview">
+    <div class="stats" id="stats-row">
+      <div class="stat-p"><div class="stat-n" id="st-teachers">0</div><div class="stat-l">Teachers</div></div>
+      <div class="stat-p"><div class="stat-n" id="st-today">0</div><div class="stat-l">Today Check-ins</div></div>
+      <div class="stat-p"><div class="stat-n" id="st-in">0</div><div class="stat-l">Currently In</div></div>
+      <div class="stat-p"><div class="stat-n" id="st-week">0</div><div class="stat-l">This Week</div></div>
     </div>
-    <div class="section-title">📋 Recent Activity</div>
-    <div class="log-list" id="admin-recent-log">
-      <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet</div></div>
+    <div class="sec-title">📋 Recent Activity</div>
+    <div class="log-list" id="admin-log">
+      <div class="empty"><div class="empty-ic">📭</div><div class="empty-tx">No records yet</div></div>
     </div>
   </div>
 
-  <!-- TEACHERS -->
-  <div class="a-section" id="asec-teachers">
-    <div class="a-card">
-      <div class="a-card-head">
-        <span class="a-card-title">Registered Teachers</span>
-        <button class="btn btn-teal btn-sm" onclick="toggleAddForm()">+ Add Teacher</button>
+  <!-- teachers -->
+  <div class="a-sec" id="as-teachers">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-ttl">Registered Teachers</span>
+        <button class="btn btn-t btn-sm" onclick="toggleAddForm()">+ Add Teacher</button>
       </div>
-      <div id="add-form-wrap" style="display:none;padding:18px;border-bottom:1px solid var(--border);">
-        <div class="f-row">
-          <label class="f-label">Full Name *</label>
-          <input type="text" class="f-input" id="new-name" placeholder="e.g. Jane Wanjiku Kamau">
-        </div>
-        <div class="f-row">
-          <label class="f-label">TSC Number (optional)</label>
-          <input type="text" class="f-input" id="new-tsc" placeholder="e.g. TSC/123456">
-        </div>
-        <div style="display:flex;gap:10px;">
-          <button class="btn btn-teal" onclick="addTeacher()">Add Teacher</button>
-          <button class="btn btn-ghost" onclick="toggleAddForm()">Cancel</button>
+      <div id="add-form" style="display:none;padding:18px;border-bottom:1px solid var(--bdr)">
+        <div class="f-row"><label class="f-lbl">Full Name *</label><input type="text" class="f-in" id="new-name" placeholder="e.g. Jane Wanjiku Kamau"></div>
+        <div class="f-row"><label class="f-lbl">TSC Number (optional)</label><input type="text" class="f-in" id="new-tsc" placeholder="e.g. TSC/123456"></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-t" onclick="addTeacher()">Add Teacher</button>
+          <button class="btn btn-gh" onclick="toggleAddForm()">Cancel</button>
         </div>
       </div>
-      <div class="a-card-body" id="teachers-list">
-        <div class="empty"><div class="empty-icon">👥</div><div class="empty-text">No teachers yet</div></div>
+      <div class="card-body" id="teachers-list">
+        <div class="empty"><div class="empty-ic">👥</div><div class="empty-tx">No teachers yet</div></div>
       </div>
     </div>
   </div>
 
-  <!-- REPORTS -->
-  <div class="a-section" id="asec-reports">
-    <div class="a-card">
-      <div class="a-card-head"><span class="a-card-title">Attendance Report</span></div>
-      <div class="a-card-body">
-        <div class="report-controls">
-          <select class="f-select" id="rpt-period" onchange="renderReport()" style="flex:1;min-width:120px;">
+  <!-- reports -->
+  <div class="a-sec" id="as-reports">
+    <div class="card">
+      <div class="card-head"><span class="card-ttl">Attendance Report</span></div>
+      <div class="card-body">
+        <div class="rpt-ctrl">
+          <select class="f-sel" id="rpt-period" onchange="renderReport()" style="flex:1;min-width:120px">
             <option value="daily">Today</option>
             <option value="weekly">This Week</option>
             <option value="monthly">This Month</option>
           </select>
-          <select class="f-select" id="rpt-teacher" onchange="renderReport()" style="flex:2;min-width:140px;">
+          <select class="f-sel" id="rpt-teacher" onchange="renderReport()" style="flex:2;min-width:140px">
             <option value="all">All Teachers</option>
           </select>
-          <button class="btn btn-teal btn-sm" onclick="exportPDF()">⬇ PDF</button>
+          <button class="btn btn-t btn-sm" onclick="exportPDF()">⬇ PDF</button>
         </div>
         <div class="tbl-wrap">
-          <table class="report-tbl" id="rpt-table">
-            <thead>
-              <tr>
-                <th>Teacher</th>
-                <th>Date</th>
-                <th>In</th>
-                <th>Out</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
+          <table class="rpt-tbl">
+            <thead><tr><th>Teacher</th><th>TSC</th><th>Date</th><th>In</th><th>Out</th><th>Duration</th></tr></thead>
             <tbody id="rpt-body"></tbody>
           </table>
-          <div class="empty" id="rpt-empty" style="display:none;"><div class="empty-icon">📄</div><div class="empty-text">No records for this period</div></div>
+          <div class="empty" id="rpt-empty" style="display:none"><div class="empty-ic">📄</div><div class="empty-tx">No records for this period</div></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- INDIVIDUAL -->
-  <div class="a-section" id="asec-individual">
-    <div class="f-row">
-      <label class="f-label">Select Teacher</label>
-      <select class="f-select" id="ind-sel" onchange="renderIndividual()">
+  <!-- individual -->
+  <div class="a-sec" id="as-individual">
+    <div class="f-row"><label class="f-lbl">Select Teacher</label>
+      <select class="f-sel" id="ind-sel" onchange="renderIndividual()">
         <option value="">— Choose teacher —</option>
       </select>
     </div>
     <div id="ind-content">
-      <div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Select a teacher to view statistics</div></div>
+      <div class="empty"><div class="empty-ic">📈</div><div class="empty-tx">Select a teacher to view stats</div></div>
     </div>
   </div>
 
-  <!-- SETTINGS -->
-  <div class="a-section" id="asec-settings">
-    <!-- School Configuration -->
-    <div class="a-card" style="margin-bottom:16px;">
-      <div class="a-card-head"><span class="a-card-title">⚙️ School Configuration</span></div>
-      <div class="a-card-body">
-        <div class="f-row">
-          <label class="f-label">School Name</label>
-          <input type="text" class="f-input" id="s-name" placeholder="e.g. Sunrise Primary School">
+  <!-- settings -->
+  <div class="a-sec" id="as-settings">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><span class="card-ttl">⚙️ School Configuration</span></div>
+      <div class="card-body">
+        <div class="f-row"><label class="f-lbl">School Name</label><input type="text" class="f-in" id="s-name" placeholder="e.g. Sunrise Primary School"></div>
+        <div class="f-g2">
+          <div class="f-row"><label class="f-lbl">Latitude</label><input type="number" class="f-in" id="s-lat" placeholder="-1.286389" step="0.000001"></div>
+          <div class="f-row"><label class="f-lbl">Longitude</label><input type="number" class="f-in" id="s-lng" placeholder="36.817223" step="0.000001"></div>
         </div>
-        <div class="f-grid2">
-          <div class="f-row">
-            <label class="f-label">Latitude</label>
-            <input type="number" class="f-input" id="s-lat" placeholder="-1.286389" step="0.000001">
-          </div>
-          <div class="f-row">
-            <label class="f-label">Longitude</label>
-            <input type="number" class="f-input" id="s-lng" placeholder="36.817223" step="0.000001">
-          </div>
-        </div>
-        <div class="f-row">
-          <label class="f-label">Geofence Radius (meters)</label>
-          <input type="number" class="f-input" id="s-radius" value="300" min="50" max="2000">
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-teal" id="save-settings-btn" onclick="saveSettings()">💾 Save Settings</button>
-          <button class="btn btn-ghost" onclick="useMyLocation()">📍 Use My GPS Location</button>
+        <div class="f-row"><label class="f-lbl">Geofence Radius (m)</label><input type="number" class="f-in" id="s-rad" value="300" min="50" max="2000"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-t" id="save-btn" onclick="saveSettings()">💾 Save Settings</button>
+          <button class="btn btn-gh" onclick="useMyGPS()">📍 Use My GPS</button>
         </div>
       </div>
     </div>
-
-    <!-- Change Admin Password -->
-    <div class="a-card">
-      <div class="a-card-head"><span class="a-card-title">🔐 Change Admin Password</span></div>
-      <div class="a-card-body">
-        <div class="f-row">
-          <label class="f-label">Current Password</label>
-          <div style="position:relative;">
-            <input type="password" class="f-input" id="pin-current" placeholder="Enter current PIN" maxlength="8"
-              style="padding-right:44px;">
-            <button onclick="togglePinVis('pin-current',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
-          </div>
-        </div>
-        <div class="f-row">
-          <label class="f-label">New Password (min 4 digits)</label>
-          <div style="position:relative;">
-            <input type="password" class="f-input" id="pin-new" placeholder="New PIN" maxlength="8"
-              style="padding-right:44px;">
-            <button onclick="togglePinVis('pin-new',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
-          </div>
-        </div>
-        <div class="f-row">
-          <label class="f-label">Confirm New Password</label>
-          <div style="position:relative;">
-            <input type="password" class="f-input" id="pin-confirm" placeholder="Repeat new PIN" maxlength="8"
-              style="padding-right:44px;">
-            <button onclick="togglePinVis('pin-confirm',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;">👁</button>
-          </div>
-        </div>
-        <div id="pin-change-err" style="font-size:12px;color:var(--rose);margin-bottom:10px;display:none;"></div>
-        <button class="btn btn-teal" onclick="changeAdminPin()">🔑 Update Password</button>
+    <div class="card">
+      <div class="card-head"><span class="card-ttl">🔐 Change Admin Password</span></div>
+      <div class="card-body">
+        <div class="f-row"><label class="f-lbl">Current Password</label>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cur" placeholder="Current PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-cur',this)">👁</button></div></div>
+        <div class="f-row"><label class="f-lbl">New Password (min 4)</label>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-new" placeholder="New PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-new',this)">👁</button></div></div>
+        <div class="f-row"><label class="f-lbl">Confirm New Password</label>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cfm" placeholder="Repeat PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-cfm',this)">👁</button></div></div>
+        <div id="pin-err" style="font-size:12px;color:var(--rose);margin-bottom:10px;display:none"></div>
+        <button class="btn btn-t" onclick="changePin()">🔑 Update Password</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══ ATTRIBUTION ══ -->
+<!-- Super Admin page is now in superadmin.html -->
 
 <!-- ══ BOTTOM NAV ══ -->
-<nav class="bottom-nav">
-  <button class="bn-btn active" id="bn-clock" onclick="goPage('clock')">
-    <span class="bn-icon">⏱</span>Clock In/Out
+<nav class="bnav">
+  <button class="bn on" id="bn-clock" onclick="goPage('clock')">
+    <span class="bni">⏱</span>Clock In/Out
   </button>
-  <button class="bn-btn" id="bn-admin" onclick="requireAdmin()">
-    <span class="bn-icon">🛡</span>Admin
+  <button class="bn" id="bn-admin" onclick="requireAdmin()">
+    <span class="bni">🛡</span>Admin
   </button>
 </nav>
 
-<!-- Admin login -->
-<div class="login-full" id="login-screen">
-  <div class="login-box">
-    <div class="login-title">Admin Dashboard</div>
-    <div class="login-sub">Enter your admin PIN to continue</div>
-    <div class="f-row">
-      <label class="f-label">PIN</label>
-      <input type="password" class="f-input" id="pin-input" placeholder="••••" maxlength="8" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <div class="login-err" id="login-err">Incorrect PIN. Try again.</div>
-    <button class="btn btn-teal btn-full" onclick="doLogin()" style="margin-bottom:10px;">Enter Dashboard</button>
-    <button class="btn btn-ghost btn-full" onclick="closeLogin()">Cancel</button>
-  </div>
-</div>
-
-<!-- Delete confirm -->
+<!-- ══ DELETE TEACHER MODAL ══ -->
 <div class="modal-bg" id="del-modal">
   <div class="modal-box">
     <div class="modal-title">Delete Teacher?</div>
-    <div class="modal-text" id="del-modal-txt">This will permanently delete the teacher and all their records.</div>
+    <div class="modal-text" id="del-txt">This will permanently delete the teacher and all records.</div>
     <div class="modal-btns">
-      <button class="btn btn-ghost btn-sm" onclick="closeDelModal()">Cancel</button>
-      <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete</button>
+      <button class="btn btn-gh btn-sm" onclick="closeDelModal()">Cancel</button>
+      <button class="btn btn-d btn-sm" onclick="confirmDelete()">Delete</button>
     </div>
   </div>
 </div>
 
-<!-- Colleague confirmation modal -->
-<div class="modal-bg" id="colleague-modal">
+<!-- delete school modal is in superadmin.html -->
+
+<!-- ══ COLLEAGUE MODAL ══ -->
+<div class="modal-bg" id="coll-modal">
   <div class="modal-box">
-    <div style="font-size:36px;text-align:center;margin-bottom:12px;">👥</div>
-    <div class="modal-title" style="text-align:center;">Clocking for a Colleague?</div>
-    <div class="modal-text" style="text-align:center;" id="colleague-modal-text">
-      You are already remembered on this device.<br>Are you clocking in/out for yourself or a colleague?
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <button class="btn btn-teal" onclick="colleagueSelf()" style="width:100%;">🙋 It's me — switch to my name</button>
-      <button class="btn btn-ghost" onclick="colleagueColleague()" style="width:100%;">👤 Clocking for a colleague</button>
-      <button class="btn btn-ghost" onclick="closeColleagueModal()" style="width:100%;color:var(--text3);font-size:12px;">Cancel</button>
+    <div style="font-size:36px;text-align:center;margin-bottom:12px">👥</div>
+    <div class="modal-title" style="text-align:center">Clocking for a Colleague?</div>
+    <div class="modal-text" style="text-align:center" id="coll-txt">Are you clocking for yourself or a colleague?</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-t" onclick="collSelf()" style="width:100%">🙋 It's me — use my name</button>
+      <button class="btn btn-gh" onclick="collColleague()" style="width:100%">👤 Clock for a colleague</button>
+      <button class="btn btn-gh" onclick="closeCollModal()" style="width:100%;color:var(--tx3);font-size:12px">Cancel</button>
     </div>
   </div>
 </div>
 
-<!-- Device limit modal -->
-<div class="modal-bg" id="device-limit-modal">
+<!-- ══ DEVICE LIMIT MODAL ══ -->
+<div class="modal-bg" id="dev-limit-modal">
   <div class="modal-box">
-    <div style="font-size:36px;text-align:center;margin-bottom:12px;">⛔</div>
-    <div class="modal-title" style="text-align:center;">Device Limit Reached</div>
-    <div class="modal-text" style="text-align:center;">
-      This device has already been used to clock in <strong>2 teachers</strong> today.<br><br>
-      Each device is limited to a maximum of 2 teachers per day to prevent misuse.
+    <div style="font-size:36px;text-align:center;margin-bottom:12px">⛔</div>
+    <div class="modal-title" style="text-align:center">Device Limit Reached</div>
+    <div class="modal-text" style="text-align:center">This device has already clocked in <strong>2 teachers</strong> today. Maximum 2 per device per day to prevent misuse.</div>
+    <div class="modal-btns" style="justify-content:center">
+      <button class="btn btn-t btn-sm" onclick="document.getElementById('dev-limit-modal').classList.remove('open')">Understood</button>
     </div>
-    <div class="modal-btns" style="justify-content:center;">
-      <button class="btn btn-teal btn-sm" onclick="document.getElementById('device-limit-modal').classList.remove('open')">Understood</button>
+  </div>
+</div>
+
+<!-- ══ PWA BANNER ══ -->
+<div class="pwa-banner" id="pwa-banner">
+  <div style="font-size:28px;flex-shrink:0">🏫</div>
+  <div class="pwa-b-txt"><div class="pwa-b-ttl">Install EduTrack</div><div class="pwa-b-sub">Add to home screen — works offline</div></div>
+  <div class="pwa-b-btns">
+    <button class="btn btn-t btn-sm" id="pwa-install-btn">📲 Install</button>
+    <button class="btn btn-gh btn-sm" onclick="hidePWABanner()">✕</button>
+  </div>
+</div>
+
+<!-- ══ iOS INSTALL SHEET ══ -->
+<div class="modal-bg" id="ios-sheet">
+  <div class="modal-box" style="max-width:340px">
+    <div style="text-align:center;font-size:40px;margin-bottom:12px">📲</div>
+    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:16px">Install EduTrack</div>
+    <div style="font-size:13px;color:var(--tx2);line-height:1.9;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span>1️⃣</span> Tap <strong style="color:var(--teal)">Share</strong> ⬆️ at the bottom of Safari</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span>2️⃣</span> Tap <strong style="color:var(--teal)">Add to Home Screen</strong></div>
+      <div style="display:flex;align-items:center;gap:8px"><span>3️⃣</span> Tap <strong style="color:var(--teal)">Add</strong> — done! 🎉</div>
     </div>
+    <button class="btn btn-t btn-full" onclick="closeIOSSheet()">Got it</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="attr">Powered by <span>Mr. Saisi Nyongesa Sammy</span></div>
 
-<!-- PWA Install Banner (Android/Chrome) -->
-<div class="pwa-banner" id="pwa-banner">
-  <div class="pwa-banner-icon">🏫</div>
-  <div class="pwa-banner-text">
-    <div class="pwa-banner-title">Install EduTrack</div>
-    <div class="pwa-banner-sub">Add to home screen — works offline</div>
-  </div>
-  <div class="pwa-banner-btns">
-    <button class="btn btn-teal btn-sm" id="pwa-install-btn">📲 Install</button>
-    <button class="btn btn-ghost btn-sm" onclick="hideInstallBanner()">✕</button>
-  </div>
-</div>
-
-<!-- iOS Install Instructions Sheet -->
-<div class="modal-bg" id="ios-install-sheet">
-  <div class="modal-box" style="max-width:340px;">
-    <div style="text-align:center;font-size:40px;margin-bottom:12px;">📲</div>
-    <div class="modal-title" style="text-align:center;margin-bottom:8px;">Install EduTrack</div>
-    <div style="font-size:13px;color:var(--text2);line-height:1.9;margin-bottom:20px;">
-      To install on your iPhone or iPad:<br>
-      <span style="display:flex;align-items:center;gap:8px;margin-top:10px;">
-        <span style="font-size:20px;">1️⃣</span> Tap the <strong style="color:var(--teal)">Share</strong> button
-        <span style="font-size:18px;">⬆️</span> at the bottom of Safari
-      </span>
-      <span style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <span style="font-size:20px;">2️⃣</span> Scroll down and tap <strong style="color:var(--teal)">Add to Home Screen</strong>
-      </span>
-      <span style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <span style="font-size:20px;">3️⃣</span> Tap <strong style="color:var(--teal)">Add</strong> — done! 🎉
-      </span>
-    </div>
-    <button class="btn btn-teal btn-full" onclick="closeIOSSheet()">Got it</button>
-  </div>
-</div>
-
-<!-- Attribution -->
-<div class="attribution">Powered by <span>Mr. Saisi Nyongesa Sammy</span></div>
-
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
 <script>
-// ═══════════════════════════════════════════════════════
-//  CORE STATE
-// ═══════════════════════════════════════════════════════
-let DB_MODE = 'local'; // 'firebase' | 'local'
-let fb = null; // firebase refs
+'use strict';
+
+// ── STATE ──
+let DB = 'local';       // 'firebase' | 'local'
+let fb = null;          // firebase helpers
+let schoolId = null;    // currently active school
+let allSchools = [];    // loaded by school selector
 
 let settings  = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234' };
 let teachers  = [];
 let records   = [];
-let activeSessions = {};
+let sessions  = {};     // { teacherId: isoTimestamp }
 
-let userPos = null, isInside = false;
-let selectedTeacher = null;
-let adminLoggedIn = false;
-let sessionInterval = null;
-let pendingDeleteId = null;
+let userPos   = null, isInside = false;
+let selTeacher = null;
+let adminOK   = false;
+let sessTimer = null;
+let pendDelId = null;
+let selectColleague = false;
 
-// ═══════════════════════════════════════════════════════
-//  AUTO LAUNCH — connects to Firebase immediately
-// ═══════════════════════════════════════════════════════
-async function autoLaunch() {
-  if (window._firebase?.firebaseReady) {
-    // Firebase config is baked in — connect directly
-    DB_MODE = 'firebase';
-    fb = window._firebase;
+// GPS smoothing
+const GPS_H = [], MAX_S = 5, MAX_ACC = 200, BUF = 40, CONF = 2, FAST = 80;
+let pendIn = null, confCnt = 0, gpsRdy = false;
+
+// Firestore unsub handles
+let unsubs = [];
+
+// ─────────────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────────────
+async function boot() {
+  if (window._fb?.ok) {
+    DB = 'firebase';
+    fb = window._fb;
     try {
-      await loadFromFirebase();
-      launchApp();
-      listenFirebase();
+      await loadAllSchools();
     } catch(e) {
-      console.warn('Firebase failed, falling back to local:', e);
-      DB_MODE = 'local';
-      loadLocal();
-      launchApp();
-      showOfflineBanner(true);
+      console.warn('Firebase load failed:', e);
+      DB = 'local';
     }
   } else {
-    // Firebase module not ready yet — wait for event
-    window.addEventListener('firebase-ready', () => autoLaunch());
+    window.addEventListener('fb-ready', boot, { once:true });
+    return;
+  }
+  hideSplash();
+
+  // ── Remember school: auto-enter the last selected school ──
+  const savedId = localStorage.getItem('et_school');
+  if (savedId && allSchools.find(s => s.id === savedId)) {
+    await enterSchool(savedId);
+    return;
+  }
+
+  // If only one school exists, go straight to it for convenience
+  if (allSchools.length === 1) {
+    await enterSchool(allSchools[0].id);
+  } else {
+    openSchoolSel();
   }
 }
+window.addEventListener('fb-ready', boot, { once:true });
 
-function launchApp() {
-  const splash = document.getElementById('splash');
-  splash.style.opacity = '0';
-  splash.style.transition = 'opacity 0.4s ease';
-  setTimeout(() => splash.style.display = 'none', 400);
-  applySettings();
-  startGPS();
-  renderTodayLog();
-  renderTeacherDropdown('');
-  // Restore remembered teacher after teachers list is ready
-  setTimeout(restoreRememberedTeacher, 300);
-  setInterval(updateClock, 1000);
-  updateClock();
-  document.getElementById('today-lbl').textContent = new Date().toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'});
-  updateSyncDot();
+function hideSplash() {
+  const s = el('splash');
+  s.style.opacity = '0';
+  s.style.transition = 'opacity .4s';
+  setTimeout(() => s.style.display = 'none', 400);
 }
 
-// Kick off immediately
-autoLaunch();
-
-// ═══════════════════════════════════════════════════════
-//  LOCAL STORAGE
-// ═══════════════════════════════════════════════════════
-function loadLocal() {
-  const load = (k,d) => { try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
-  settings       = load('et_settings', settings);
-  teachers       = load('et_teachers', []);
-  records        = load('et_records', []);
-  activeSessions = load('et_sessions', {});
-}
-function saveLocal() {
-  const save = (k,v) => { try{localStorage.setItem(k,JSON.stringify(v));}catch{} };
-  save('et_settings', settings);
-  save('et_teachers', teachers);
-  save('et_records', records);
-  save('et_sessions', activeSessions);
+// ─────────────────────────────────────────────────────
+//  SCHOOL SELECTOR
+// ─────────────────────────────────────────────────────
+async function loadAllSchools() {
+  if (DB !== 'firebase') return;
+  const { db, collection, getDocs } = fb;
+  const snap = await getDocs(collection(db, 'schools'));
+  allSchools = snap.docs.map(d => ({ id:d.id, ...d.data() }))
+    .sort((a,b) => (a.schoolName||a.id).localeCompare(b.schoolName||b.id));
 }
 
-// ═══════════════════════════════════════════════════════
-//  FIREBASE OPERATIONS
-// ═══════════════════════════════════════════════════════
-async function loadFromFirebase() {
-  const { db, collection, getDocs, doc, getDoc } = fb;
+function openSchoolSel() {
+  el('school-sel').classList.add('open');
+  renderSchoolList();
+}
+function closeSchoolSel() {
+  el('school-sel').classList.remove('open');
+}
+
+function renderSchoolList() {
+  const container = el('school-list');
+  if (!allSchools.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-ic">🏫</div><div class="empty-tx">No schools registered yet.<br>Ask your Super Admin to register schools.</div></div>';
+    return;
+  }
+  container.innerHTML = allSchools.map(s => `
+    <div class="school-opt" onclick="enterSchool('${esc(s.id)}')">
+      <div class="school-opt-ic">🏫</div>
+      <div>
+        <div class="school-opt-name">${esc(s.schoolName || s.id)}</div>
+        <div class="school-opt-id">ID: ${esc(s.id)}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function enterSchool(id) {
+  schoolId = id;
+  localStorage.setItem('et_school', id);
+  closeSchoolSel();
+  // Reset state
+  teachers=[]; records=[]; sessions={};
+  settings = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234' };
+  adminOK = false;
+  selTeacher = null;
+  unsubs.forEach(u=>u()); unsubs=[];
+  stopSessTimer();
+
   try {
-    // Settings
-    const snap = await getDoc(doc(db,'school','settings'));
-    if (snap.exists()) settings = {...settings, ...snap.data()};
-
-    // Teachers
-    const ts = await getDocs(collection(db,'teachers'));
-    teachers = ts.docs.map(d => ({id:d.id,...d.data()}));
-
-    // Records (last 90 days)
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-90);
-    const rs = await getDocs(collection(db,'records'));
-    records = rs.docs.map(d => ({id:d.id,...d.data()}))
-      .filter(r => new Date(r.ts) > cutoff)
-      .sort((a,b) => new Date(a.ts)-new Date(b.ts));
-
-    // Active sessions
-    const as = await getDocs(collection(db,'sessions'));
-    activeSessions = {};
-    as.docs.forEach(d => { activeSessions[d.id] = d.data().ts; });
-
-    showToast('☁️ Cloud data loaded');
+    if (DB === 'firebase') {
+      await loadSchoolData();
+      listenSchool();
+    } else {
+      loadLocal();
+    }
   } catch(e) {
-    console.error('Firebase load error:', e);
+    console.warn('Load failed, falling back to local:', e);
     loadLocal();
     showOfflineBanner(true);
   }
+  applySettings();
+  startGPS();
+  renderTodayLog();
+  renderTeacherDD('');
+  setTimeout(restoreRemembered, 400);
+  el('today-lbl').textContent = new Date().toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'});
+  setInterval(tickClock, 1000); tickClock();
+  syncDot();
 }
 
-function listenFirebase() {
-  if (!fb?.db) return;
-  const { db, doc, collection, onSnapshot, orderBy, query } = fb;
+function goSwitchSchool() {
+  if (!schoolId) return;
+  unsubs.forEach(u=>u()); unsubs=[];
+  stopSessTimer(); selTeacher=null; adminOK=false;
+  clearTeacherUI();
+  openSchoolSel();
+  goPage('clock');
+}
 
-  // Listen to settings in real time
-  onSnapshot(doc(db,'school','settings'), snap => {
-    if (snap.exists()) {
-      const data = snap.data();
-      // Explicitly parse lat/lng as numbers to guard against Firestore type quirks
-      if (data.lat  !== undefined) data.lat  = parseFloat(data.lat);
-      if (data.lng  !== undefined) data.lng  = parseFloat(data.lng);
-      if (data.radius !== undefined) data.radius = parseInt(data.radius);
-      settings = { ...settings, ...data };
-      saveLocal();
-      applySettings();   // applySettings already guards against overwriting focused fields
-      drawMap();
-      updateClockButtons();
-    }
-  });
+// ─────────────────────────────────────────────────────
+//  LOCAL STORAGE (scoped per school)
+// ─────────────────────────────────────────────────────
+function K(k){ return `et_${schoolId||'x'}_${k}`; }
+function loadLocal() {
+  const g=(k,d)=>{ try{const v=localStorage.getItem(K(k));return v?JSON.parse(v):d;}catch{return d;} };
+  settings = g('settings', settings);
+  teachers = g('teachers', []);
+  records  = g('records',  []);
+  sessions = g('sessions', {});
+}
+function saveLocal() {
+  const s=(k,v)=>{ try{localStorage.setItem(K(k),JSON.stringify(v));}catch{} };
+  s('settings',settings); s('teachers',teachers); s('records',records); s('sessions',sessions);
+}
 
-  // Listen to records in real time
-  onSnapshot(collection(db,'records'), snap => {
-    records = snap.docs.map(d => ({id:d.id,...d.data()}))
-      .sort((a,b) => new Date(a.ts)-new Date(b.ts));
+// ─────────────────────────────────────────────────────
+//  FIREBASE — scoped under schools/{schoolId}/
+// ─────────────────────────────────────────────────────
+async function loadSchoolData() {
+  const { db, doc, getDoc, collection, getDocs } = fb;
+  // settings
+  const cfg = await getDoc(doc(db,'schools',schoolId,'config','settings'));
+  if (cfg.exists()) settings = { ...settings, ...cfg.data() };
+  // teachers
+  const ts = await getDocs(collection(db,'schools',schoolId,'teachers'));
+  teachers = ts.docs.map(d=>({id:d.id,...d.data()}));
+  // records (last 90 days)
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-90);
+  const rs = await getDocs(collection(db,'schools',schoolId,'records'));
+  records = rs.docs.map(d=>({id:d.id,...d.data()}))
+    .filter(r=>new Date(r.ts)>cutoff)
+    .sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  // active sessions
+  const ss = await getDocs(collection(db,'schools',schoolId,'sessions'));
+  sessions={}; ss.docs.forEach(d=>{sessions[d.id]=d.data().ts;});
+  showToast('☁️ Loaded');
+}
+
+function listenSchool() {
+  const { db, doc, collection, onSnapshot } = fb;
+  // settings
+  unsubs.push(onSnapshot(doc(db,'schools',schoolId,'config','settings'), snap=>{
+    if(!snap.exists()) return;
+    const d=snap.data();
+    if(d.lat!=null) d.lat=parseFloat(d.lat);
+    if(d.lng!=null) d.lng=parseFloat(d.lng);
+    if(d.radius!=null) d.radius=parseInt(d.radius);
+    settings={...settings,...d}; saveLocal();
+    applySettings(); drawMap(); updateBtns();
+  }));
+  // teachers
+  unsubs.push(onSnapshot(collection(db,'schools',schoolId,'teachers'), snap=>{
+    teachers=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTeacherDD('');
+    if(adminOK) refreshAdmin();
+    if(!selTeacher) restoreRemembered();
+  }));
+  // records
+  unsubs.push(onSnapshot(collection(db,'schools',schoolId,'records'), snap=>{
+    records=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     renderTodayLog();
-    if (adminLoggedIn) refreshAdminViews();
-  });
-
-  // Listen to teachers
-  onSnapshot(collection(db,'teachers'), snap => {
-    teachers = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderTeacherDropdown('');
-    if (adminLoggedIn) refreshAdminViews();
-    // Re-restore remembered teacher in case it loaded after initial render
-    if (!selectedTeacher) restoreRememberedTeacher();
-  });
-
-  // Sessions
-  onSnapshot(collection(db,'sessions'), snap => {
-    activeSessions = {};
-    snap.docs.forEach(d => { activeSessions[d.id] = d.data().ts; });
-    updateClockButtons();
-  });
+    if(adminOK) refreshAdmin();
+  }));
+  // sessions
+  unsubs.push(onSnapshot(collection(db,'schools',schoolId,'sessions'), snap=>{
+    sessions={}; snap.docs.forEach(d=>{sessions[d.id]=d.data().ts;});
+    updateBtns();
+  }));
 }
 
 async function fbSaveSettings() {
-  if (!fb?.db) return;
   const { db, doc, setDoc } = fb;
-  // Ensure lat/lng are stored as proper JS Numbers, not strings
-  const payload = {
-    ...settings,
-    lat:    settings.lat    != null ? Number(settings.lat)    : null,
-    lng:    settings.lng    != null ? Number(settings.lng)    : null,
-    radius: settings.radius != null ? Number(settings.radius) : 300,
-  };
-  // merge:true means we only update fields we send, never wipe others
-  await setDoc(doc(db,'school','settings'), payload, { merge: true });
+  const p = { ...settings,
+    lat: settings.lat!=null?Number(settings.lat):null,
+    lng: settings.lng!=null?Number(settings.lng):null,
+    radius: Number(settings.radius)||300 };
+  await setDoc(doc(db,'schools',schoolId,'config','settings'), p, {merge:true});
+  // Also update root school doc name
+  await setDoc(doc(db,'schools',schoolId), {schoolName:settings.schoolName}, {merge:true});
 }
-
-async function fbAddTeacher(t) {
-  if (!fb?.db) return;
+async function fbSaveTeacher(t) {
   const { db, doc, setDoc } = fb;
-  await setDoc(doc(db,'teachers',t.id), t);
+  await setDoc(doc(db,'schools',schoolId,'teachers',t.id), t);
 }
-
 async function fbDeleteTeacher(id) {
-  if (!fb?.db) return;
-  const { db, doc, deleteDoc, collection, getDocs, query, where } = fb;
-  await deleteDoc(doc(db,'teachers',id));
-  const rs = await getDocs(fb.query(collection(db,'records'), fb.where('teacherId','==',id)));
-  for (const r of rs.docs) await deleteDoc(doc(db,'records',r.id));
-  await deleteDoc(doc(db,'sessions',id));
+  const { db, doc, collection, deleteDoc, getDocs, query, where } = fb;
+  await deleteDoc(doc(db,'schools',schoolId,'teachers',id));
+  const rs = await getDocs(query(collection(db,'schools',schoolId,'records'), where('teacherId','==',id)));
+  for(const r of rs.docs) await deleteDoc(doc(db,'schools',schoolId,'records',r.id));
+  try { await deleteDoc(doc(db,'schools',schoolId,'sessions',id)); } catch(e){}
 }
-
 async function fbAddRecord(r) {
-  if (!fb?.db) return;
   const { db, doc, setDoc } = fb;
-  await setDoc(doc(db,'records',r.id), r);
+  await setDoc(doc(db,'schools',schoolId,'records',r.id), r);
 }
-
-async function fbSetSession(teacherId, ts) {
-  if (!fb?.db) return;
+async function fbSetSession(tid, ts) {
   const { db, doc, setDoc, deleteDoc } = fb;
-  if (ts) await setDoc(doc(db,'sessions',teacherId), {ts});
-  else await deleteDoc(doc(db,'sessions',teacherId));
+  if(ts) await setDoc(doc(db,'schools',schoolId,'sessions',tid),{ts});
+  else await deleteDoc(doc(db,'schools',schoolId,'sessions',tid));
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  SETTINGS
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 function applySettings() {
-  document.getElementById('h-school-name').textContent = settings.schoolName || 'No school set';
-  // Only update form fields when admin section is NOT actively focused
-  // (avoids overwriting while user is typing)
+  el('h-school').textContent = settings.schoolName || (schoolId || 'Select school…');
   const active = document.activeElement;
-  const editingSettings = active && ['s-name','s-lat','s-lng','s-radius'].includes(active.id);
-  if (!editingSettings) {
-    document.getElementById('s-name').value   = settings.schoolName || '';
-    // Use != null check so lat/lng of 0.0 don't become empty string
-    document.getElementById('s-lat').value    = settings.lat  != null ? settings.lat  : '';
-    document.getElementById('s-lng').value    = settings.lng  != null ? settings.lng  : '';
-    document.getElementById('s-radius').value = settings.radius || 300;
+  const editing = active && ['s-name','s-lat','s-lng','s-rad'].includes(active.id);
+  if (!editing) {
+    el('s-name').value = settings.schoolName || '';
+    el('s-lat').value  = settings.lat!=null  ? settings.lat  : '';
+    el('s-lng').value  = settings.lng!=null  ? settings.lng  : '';
+    el('s-rad').value  = settings.radius || 300;
   }
 }
-
 async function saveSettings() {
-  const name = document.getElementById('s-name').value.trim();
-  const lat  = parseFloat(document.getElementById('s-lat').value);
-  const lng  = parseFloat(document.getElementById('s-lng').value);
-  const rad  = parseInt(document.getElementById('s-radius').value) || 300;
-
-  if (!name) { showToast('⚠️ School name required'); return; }
-  if (isNaN(lat) || isNaN(lng)) { showToast('⚠️ Valid coordinates required'); return; }
-  if (rad < 50 || rad > 2000) { showToast('⚠️ Radius must be between 50–2000 m'); return; }
-
-  // PIN is managed separately via changeAdminPin — don't touch it here
-  settings = { ...settings, schoolName: name, lat, lng, radius: rad };
+  const name = el('s-name').value.trim();
+  const lat  = parseFloat(el('s-lat').value);
+  const lng  = parseFloat(el('s-lng').value);
+  const rad  = parseInt(el('s-rad').value)||300;
+  if(!name)            { showToast('⚠️ School name required'); return; }
+  if(isNaN(lat)||isNaN(lng)) { showToast('⚠️ Valid coordinates required'); return; }
+  if(rad<50||rad>2000) { showToast('⚠️ Radius must be 50–2000 m'); return; }
+  settings = {...settings, schoolName:name, lat, lng, radius:rad};
   saveLocal();
-
-  // Visual feedback on button
-  const saveBtn = document.getElementById('save-settings-btn');
-  if (saveBtn) { saveBtn.textContent = '⏳ Saving…'; saveBtn.disabled = true; }
-
+  const btn=el('save-btn'); btn.textContent='⏳ Saving…'; btn.disabled=true;
   try {
-    if (DB_MODE === 'firebase') await fbSaveSettings();
-    applySettings();
-    drawMap();
-    updateClockButtons();
-    showToast('✅ Settings saved & synced to cloud');
-  } catch (e) {
-    console.error('Save settings error:', e);
-    applySettings(); drawMap(); updateClockButtons();
+    if(DB==='firebase') await fbSaveSettings();
+    applySettings(); drawMap(); updateBtns();
+    showToast('✅ Settings saved');
+  } catch(e) {
+    applySettings(); drawMap(); updateBtns();
     showToast('⚠️ Saved locally — cloud sync failed');
   } finally {
-    if (saveBtn) { saveBtn.textContent = '💾 Save Settings'; saveBtn.disabled = false; }
+    btn.textContent='💾 Save Settings'; btn.disabled=false;
   }
 }
-
-function useMyLocation() {
-  if (!navigator.geolocation) { showToast('❌ Geolocation not supported'); return; }
-  navigator.geolocation.getCurrentPosition(p => {
-    document.getElementById('s-lat').value = p.coords.latitude.toFixed(6);
-    document.getElementById('s-lng').value = p.coords.longitude.toFixed(6);
-    showToast('📍 GPS coordinates filled');
-  }, err => showToast('❌ ' + geoErrMsg(err)), {enableHighAccuracy:true,timeout:10000});
+function useMyGPS() {
+  if(!navigator.geolocation){ showToast('❌ Geolocation not supported'); return; }
+  navigator.geolocation.getCurrentPosition(p=>{
+    el('s-lat').value=p.coords.latitude.toFixed(6);
+    el('s-lng').value=p.coords.longitude.toFixed(6);
+    showToast('📍 GPS filled');
+  }, ()=>showToast('❌ Could not get GPS'), {enableHighAccuracy:true,timeout:10000});
 }
 
-// ═══════════════════════════════════════════════════════
-//  GPS — fast startup + smoothing + hysteresis
-// ═══════════════════════════════════════════════════════
-
-const GPS_HISTORY   = [];
-const MAX_SAMPLES   = 5;    // rolling window size (smaller = faster settling)
-const MAX_ACC       = 200;  // ignore fixes worse than 200m (raised to accept faster first fix)
-const BUFFER_M      = 40;   // hysteresis band around fence edge (metres)
-const CONFIRM_COUNT = 2;    // readings needed to confirm a zone change
-// On first load, skip confirmation and accept immediately if well inside/outside
-const FAST_ZONE_M   = 80;   // if >80m clear of boundary, flip instantly on first fix
-
-let pendingInside = null;
-let confirmCount  = 0;
-let gpsReady      = false;  // true once we have at least one accepted fix
-
-// ─── Cached last position (survives page reload) ───
-function saveCachedPos(lat, lng, acc) {
-  try {
-    localStorage.setItem('et_last_pos', JSON.stringify({ lat, lng, acc, ts: Date.now() }));
-  } catch(e) {}
-}
-function loadCachedPos() {
-  try {
-    const v = localStorage.getItem('et_last_pos');
-    if (!v) return null;
-    const p = JSON.parse(v);
-    // Only use cache if less than 10 minutes old
-    if (Date.now() - p.ts > 10 * 60 * 1000) return null;
-    return p;
-  } catch(e) { return null; }
-}
+// ─────────────────────────────────────────────────────
+//  GPS
+// ─────────────────────────────────────────────────────
+function saveCachedPos(lat,lng,acc){ try{localStorage.setItem('et_pos',JSON.stringify({lat,lng,acc,ts:Date.now()}));}catch(e){} }
+function loadCachedPos(){ try{ const v=localStorage.getItem('et_pos'); if(!v)return null; const p=JSON.parse(v); if(Date.now()-p.ts>10*60*1000)return null; return p; }catch{return null;} }
 
 function startGPS() {
-  if (!navigator.geolocation) { showGeoErr('Geolocation not supported by this browser.'); return; }
-
-  // ── Step 1: Show cached position instantly while GPS warms up ──
-  const cached = loadCachedPos();
-  if (cached && settings.lat && settings.lng) {
-    userPos = cached;
-    const dist = haversine(cached, { lat: settings.lat, lng: settings.lng });
-    // Use cached position to give instant feedback — but mark as "estimated"
-    const diffFromEdge = dist - settings.radius;
-    const edgeLabel = Math.abs(Math.round(diffFromEdge));
-    document.getElementById('coord-txt').textContent =
-      `${cached.lat.toFixed(5)}, ${cached.lng.toFixed(5)} (cached)`;
-    document.getElementById('dist-txt').textContent = diffFromEdge > 0
-      ? `~${Math.round(dist)}m — ${edgeLabel}m outside zone (updating…)`
-      : `~${Math.round(dist)}m — ${edgeLabel}m inside zone (updating…)`;
-    // Tentatively set zone from cache so buttons are not stuck on "outside"
-    const tentative = dist <= settings.radius;
-    if (tentative !== isInside) { isInside = tentative; onZoneChange(); }
-    drawMap(); updateClockButtons();
+  if(!navigator.geolocation){ showGeoErr('Geolocation not supported.'); return; }
+  // show cached instantly
+  const c=loadCachedPos();
+  if(c && settings.lat && settings.lng) {
+    userPos=c;
+    const d=haversine(c,{lat:settings.lat,lng:settings.lng});
+    el('coord-txt').textContent=`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} (cached)`;
+    el('dist-txt').textContent=`~${Math.round(d)}m (updating…)`;
+    const t=d<=settings.radius;
+    if(t!==isInside){isInside=t;onZoneChange();}
+    drawMap(); updateBtns();
   }
-
-  // ── Step 2: Fire getCurrentPosition immediately for a fast first fix ──
-  // maximumAge:30000 allows the browser to return a recently cached position
-  // immediately (sub-second) instead of waiting for a fresh satellite lock
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      onGPS(pos, true);  // true = fast-path, skip confirmation requirement
-    },
-    () => {},  // silent fail — watchPosition will still run
-    { enableHighAccuracy: true, maximumAge: 30000, timeout: 8000 }
-  );
-
-  // ── Step 3: Start continuous watch for ongoing updates ──
-  navigator.geolocation.watchPosition(
-    pos => onGPS(pos, false),
-    onGPSErr,
-    { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 }
-  );
+  navigator.geolocation.getCurrentPosition(p=>onGPS(p,true), ()=>{}, {enableHighAccuracy:true,maximumAge:30000,timeout:8000});
+  navigator.geolocation.watchPosition(p=>onGPS(p,false), onGPSErr, {enableHighAccuracy:true,maximumAge:4000,timeout:15000});
 }
 
-function onGPS(pos, fastPath) {
-  document.getElementById('geo-err').classList.remove('show');
-
-  const raw = {
-    lat: pos.coords.latitude,
-    lng: pos.coords.longitude,
-    acc: pos.coords.accuracy,
-    ts:  Date.now()
-  };
-
-  // ── Accuracy gate ──
-  if (raw.acc > MAX_ACC) {
-    if (!gpsReady) {
-      document.getElementById('dist-txt').textContent =
-        `📡 GPS accuracy ±${Math.round(raw.acc)}m — acquiring better fix…`;
-    }
-    return;
-  }
-
-  // ── Add to rolling history ──
-  // Avoid duplicate from getCurrentPosition + watchPosition firing near-simultaneously
-  const isDuplicate = GPS_HISTORY.length > 0 &&
-    Math.abs(GPS_HISTORY[0].ts - raw.ts) < 1000 &&
-    Math.abs(GPS_HISTORY[0].lat - raw.lat) < 0.00001;
-  if (!isDuplicate) {
-    GPS_HISTORY.unshift(raw);
-    if (GPS_HISTORY.length > MAX_SAMPLES) GPS_HISTORY.pop();
-  }
-
-  // ── Weighted average (weight = 1 / acc²) ──
-  let wLat = 0, wLng = 0, wSum = 0;
-  GPS_HISTORY.forEach(r => {
-    const w = 1 / (r.acc * r.acc);
-    wLat += r.lat * w; wLng += r.lng * w; wSum += w;
-  });
-  const avgLat = wLat / wSum;
-  const avgLng = wLng / wSum;
-  const avgAcc = Math.round(Math.sqrt(1 / wSum));
-
-  userPos = { lat: avgLat, lng: avgLng, acc: avgAcc };
-  saveCachedPos(avgLat, avgLng, avgAcc);
-
-  document.getElementById('coord-txt').textContent =
-    `${avgLat.toFixed(5)}, ${avgLng.toFixed(5)} ±${avgAcc}m`;
-
-  if (!settings.lat || !settings.lng) { drawMap(); updateClockButtons(); return; }
-
-  const dist = haversine(userPos, { lat: settings.lat, lng: settings.lng });
-
-  const diffFromEdge = dist - settings.radius;
-  const edgeLabel    = Math.abs(Math.round(diffFromEdge));
-  document.getElementById('dist-txt').textContent = diffFromEdge > 0
-    ? `${Math.round(dist)}m — ${edgeLabel}m outside zone`
-    : `${Math.round(dist)}m — ${edgeLabel}m inside zone`;
-
-  // ── Determine candidate zone ──
-  let candidate;
-  if (isInside) {
-    candidate = dist <= (settings.radius + BUFFER_M);
-  } else {
-    candidate = dist <= (settings.radius - BUFFER_M);
-  }
-
-  // ── Fast-path: on first fix or getCurrentPosition result,
-  //    skip confirmation if position is clearly inside or outside the buffer ──
-  const clearMargin = Math.abs(dist - settings.radius);
-  const skipConfirm = (fastPath || !gpsReady) && clearMargin > FAST_ZONE_M;
-
-  if (skipConfirm) {
-    // Accept immediately — no need to wait for CONFIRM_COUNT readings
-    if (candidate !== isInside) {
-      isInside = candidate;
-      onZoneChange();
-    }
-    gpsReady = true;
-    drawMap(); updateClockButtons();
-    return;
-  }
-
-  gpsReady = true;
-
-  // ── Normal path: require confirmation ──
-  if (candidate !== pendingInside) {
-    pendingInside = candidate;
-    confirmCount  = 1;
-  } else {
-    confirmCount++;
-  }
-
-  if (confirmCount >= CONFIRM_COUNT && candidate !== isInside) {
-    isInside     = candidate;
-    confirmCount = 0;
-    onZoneChange();
-  }
-
-  drawMap(); updateClockButtons();
+function onGPS(pos, fast) {
+  el('geo-err').classList.remove('on');
+  const raw={lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy, ts:Date.now()};
+  if(raw.acc>MAX_ACC){ if(!gpsRdy) el('dist-txt').textContent=`📡 Accuracy ±${Math.round(raw.acc)}m — acquiring…`; return; }
+  // dedupe
+  const isDup = GPS_H.length>0 && Math.abs(GPS_H[0].ts-raw.ts)<1000 && Math.abs(GPS_H[0].lat-raw.lat)<0.00001;
+  if(!isDup){ GPS_H.unshift(raw); if(GPS_H.length>MAX_S) GPS_H.pop(); }
+  // weighted avg
+  let wLat=0,wLng=0,wSum=0;
+  GPS_H.forEach(r=>{ const w=1/(r.acc*r.acc); wLat+=r.lat*w; wLng+=r.lng*w; wSum+=w; });
+  const aLat=wLat/wSum, aLng=wLng/wSum, aAcc=Math.round(Math.sqrt(1/wSum));
+  userPos={lat:aLat,lng:aLng,acc:aAcc};
+  saveCachedPos(aLat,aLng,aAcc);
+  el('coord-txt').textContent=`${aLat.toFixed(5)}, ${aLng.toFixed(5)} ±${aAcc}m`;
+  if(!settings.lat||!settings.lng){ drawMap(); updateBtns(); return; }
+  const dist=haversine(userPos,{lat:settings.lat,lng:settings.lng});
+  const diff=dist-settings.radius;
+  el('dist-txt').textContent=diff>0?`${Math.round(dist)}m — ${Math.abs(Math.round(diff))}m outside zone`:`${Math.round(dist)}m — ${Math.abs(Math.round(diff))}m inside zone`;
+  let cand = isInside ? dist<=(settings.radius+BUF) : dist<=(settings.radius-BUF);
+  const clear=Math.abs(dist-settings.radius), skip=(fast||!gpsRdy)&&clear>FAST;
+  if(skip){ if(cand!==isInside){isInside=cand;onZoneChange();} gpsRdy=true; drawMap(); updateBtns(); return; }
+  gpsRdy=true;
+  if(cand!==pendIn){ pendIn=cand; confCnt=1; } else confCnt++;
+  if(confCnt>=CONF && cand!==isInside){ isInside=cand; confCnt=0; onZoneChange(); }
+  drawMap(); updateBtns();
 }
-
-function onGPSErr(e) { showGeoErr(geoErrMsg(e)); }
-function geoErrMsg(e) {
-  return {
-    1: 'Location permission denied. Allow access in browser settings.',
-    2: 'GPS unavailable. Enable location services on your device.',
-    3: 'Location timed out. Move to an open area and try again.'
-  }[e.code] || `GPS error (code ${e.code})`;
-}
-function showGeoErr(m) {
-  const el = document.getElementById('geo-err');
-  el.textContent = '⚠️ ' + m; el.classList.add('show');
-}
-
+function onGPSErr(e){ showGeoErr({1:'Location permission denied.',2:'GPS unavailable.',3:'Location timed out.'}[e.code]||'GPS error.'); }
+function showGeoErr(m){ const e=el('geo-err'); e.textContent='⚠️ '+m; e.classList.add('on'); }
 function onZoneChange() {
-  const s = document.getElementById('zone-status');
-  const t = document.getElementById('zone-status-txt');
-  if (isInside) {
-    s.classList.add('inside'); t.textContent = 'Inside Zone';
-    showToast('✅ You are inside the school zone');
-  } else {
-    s.classList.remove('inside'); t.textContent = 'Outside Zone';
-    showToast('⚠️ You left the school zone');
-    if (selectedTeacher && activeSessions[selectedTeacher.id]) doClockOut(true);
-  }
-  updateClockButtons();
+  const pill=el('zone-pill'), txt=el('zone-txt');
+  pill.classList.toggle('in',isInside);
+  txt.textContent=isInside?'Inside Zone':'Outside Zone';
+  if(isInside) showToast('✅ You are inside the school zone');
+  else { showToast('⚠️ You left the school zone'); if(selTeacher&&sessions[selTeacher.id]) doClockOut(true); }
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  MAP CANVAS
-// ═══════════════════════════════════════════════════════
-const canvas = document.getElementById('map-canvas');
-const ctx = canvas.getContext('2d');
-
-function resizeCanvas() { canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight; drawMap(); }
-window.addEventListener('resize', resizeCanvas);
-setTimeout(resizeCanvas, 100);
+// ─────────────────────────────────────────────────────
+function resizeCanvas(){ const cv=el('map-cv'); cv.width=cv.offsetWidth; cv.height=cv.offsetHeight||240; drawMap(); }
+window.addEventListener('resize',resizeCanvas);
+setTimeout(resizeCanvas,120);
 
 function drawMap() {
-  const W=canvas.width, H=canvas.height;
+  const cv=el('map-cv'); const ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#08101e'; ctx.fillRect(0,0,W,H);
-
-  // Grid
-  ctx.strokeStyle='rgba(15,212,192,0.04)'; ctx.lineWidth=1;
+  // grid
+  ctx.strokeStyle='rgba(15,212,192,.04)'; ctx.lineWidth=1;
   for(let x=0;x<W;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let y=0;y<H;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-
-  if (!settings.lat||!settings.lng) {
-    ctx.fillStyle='rgba(100,116,139,0.5)'; ctx.font='600 13px Plus Jakarta Sans,sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText('School location not configured', W/2, H/2-8);
-    ctx.font='11px JetBrains Mono,monospace'; ctx.fillStyle='rgba(100,116,139,0.35)';
-    ctx.fillText('Admin → Settings → Set coordinates', W/2, H/2+14);
+  if(!settings.lat||!settings.lng){
+    ctx.fillStyle='rgba(100,116,139,.5)'; ctx.font='600 13px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('School location not configured',W/2,H/2-8);
+    ctx.font='11px JetBrains Mono,monospace'; ctx.fillStyle='rgba(100,116,139,.35)';
+    ctx.fillText('Admin → Settings → Set coordinates',W/2,H/2+14);
     return;
   }
-
-  const cx=W/2, cy=H/2;
-  const scale = (Math.min(W,H)*0.36) / settings.radius;
-  const r = settings.radius * scale;
-
-  // Outer glow
+  const cx=W/2, cy=H/2, scale=(Math.min(W,H)*.36)/settings.radius, r=settings.radius*scale;
   const g=ctx.createRadialGradient(cx,cy,r*.3,cx,cy,r*1.8);
-  g.addColorStop(0, isInside ? 'rgba(15,212,192,0.09)' : 'rgba(56,189,248,0.06)');
-  g.addColorStop(1,'transparent');
+  g.addColorStop(0,isInside?'rgba(15,212,192,.09)':'rgba(56,189,248,.06)'); g.addColorStop(1,'transparent');
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r*1.8,0,Math.PI*2); ctx.fill();
-
-  // Zone
-  ctx.fillStyle = isInside ? 'rgba(15,212,192,0.07)' : 'rgba(56,189,248,0.05)';
+  ctx.fillStyle=isInside?'rgba(15,212,192,.07)':'rgba(56,189,248,.05)';
   ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle = isInside ? 'rgba(15,212,192,0.55)' : 'rgba(56,189,248,0.4)';
-  ctx.lineWidth=1.5; ctx.setLineDash([6,5]);
-  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // School pin
-  ctx.fillStyle='rgba(56,189,248,0.9)'; ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle='rgba(56,189,248,0.2)'; ctx.lineWidth=10;
-  ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.stroke();
-  ctx.fillStyle='rgba(56,189,248,0.8)'; ctx.font='600 11px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
-  ctx.fillText(settings.schoolName||'School', cx, cy-r-10);
-  ctx.font='10px JetBrains Mono,monospace'; ctx.fillStyle='rgba(56,189,248,0.4)';
-  ctx.fillText(`r=${settings.radius}m`, cx+r*.28, cy-5);
-
-  // User
-  if (userPos && settings.lat && settings.lng) {
+  ctx.strokeStyle=isInside?'rgba(15,212,192,.55)':'rgba(56,189,248,.4)';
+  ctx.lineWidth=1.5; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='rgba(56,189,248,.9)'; ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(56,189,248,.2)'; ctx.lineWidth=10; ctx.beginPath(); ctx.arc(cx,cy,9,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(56,189,248,.8)'; ctx.font='600 11px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
+  ctx.fillText(settings.schoolName||'School',cx,cy-r-10);
+  ctx.font='10px JetBrains Mono,monospace'; ctx.fillStyle='rgba(56,189,248,.4)';
+  ctx.fillText(`r=${settings.radius}m`,cx+r*.28,cy-5);
+  if(userPos&&settings.lat&&settings.lng){
     const mLat=110540, mLng=111320*Math.cos(settings.lat*Math.PI/180);
     const ux=cx+(userPos.lng-settings.lng)*mLng*scale;
     const uy=cy-(userPos.lat-settings.lat)*mLat*scale;
-    ctx.strokeStyle=isInside?'rgba(15,212,192,0.2)':'rgba(244,63,94,0.2)';
+    ctx.strokeStyle=isInside?'rgba(15,212,192,.2)':'rgba(244,63,94,.2)';
     ctx.lineWidth=1; ctx.setLineDash([3,4]);
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ux,uy); ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ux,uy); ctx.stroke(); ctx.setLineDash([]);
     const ug=ctx.createRadialGradient(ux,uy,0,ux,uy,15);
-    ug.addColorStop(0,isInside?'rgba(15,212,192,0.4)':'rgba(244,63,94,0.4)'); ug.addColorStop(1,'transparent');
+    ug.addColorStop(0,isInside?'rgba(15,212,192,.4)':'rgba(244,63,94,.4)'); ug.addColorStop(1,'transparent');
     ctx.fillStyle=ug; ctx.beginPath(); ctx.arc(ux,uy,15,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=isInside?'#0fd4c0':'#f43f5e';
-    ctx.beginPath(); ctx.arc(ux,uy,6,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=isInside?'rgba(15,212,192,0.9)':'rgba(244,63,94,0.9)';
+    ctx.fillStyle=isInside?'#0fd4c0':'#f43f5e'; ctx.beginPath(); ctx.arc(ux,uy,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=isInside?'rgba(15,212,192,.9)':'rgba(244,63,94,.9)';
     ctx.font='700 10px Plus Jakarta Sans,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(selectedTeacher?initials(selectedTeacher.name):'YOU', ux, uy-13);
+    ctx.fillText(selTeacher?initials(selTeacher.name):'YOU',ux,uy-13);
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  TEACHER SEARCH
-// ═══════════════════════════════════════════════════════
-function renderTeacherDropdown(q) {
-  const dd = document.getElementById('t-dropdown');
-  const list = q.trim() ? teachers.filter(t=>t.name.toLowerCase().includes(q.toLowerCase())) : teachers;
-  if (!list.length) { dd.innerHTML='<div class="t-item" style="color:var(--text3);cursor:default;">No teachers found</div>'; return; }
-  dd.innerHTML = list.map(t=>`
-    <div class="t-item" onclick="selectTeacher('${t.id}')">
-      <div class="t-item-ava">${initials(t.name)}</div>
-      <div>
-        <div class="t-item-name">${esc(t.name)}</div>
-        <div class="t-item-tsc">${t.tsc?t.tsc:'Not TSC registered'}</div>
-      </div>
+// ─────────────────────────────────────────────────────
+//  TEACHER SEARCH / SELECT
+// ─────────────────────────────────────────────────────
+let remOn = localStorage.getItem('et_rem')==='1';
+let remId = null;
+function remKey(){ return `et_${schoolId||'x'}_rem`; }
+let ddCloseT;
+let collegueMode = false;
+
+function renderTeacherDD(q) {
+  const dd=el('t-dd');
+  const list=q.trim()?teachers.filter(t=>t.name.toLowerCase().includes(q.toLowerCase())):teachers;
+  if(!list.length){ dd.innerHTML='<div class="t-item" style="color:var(--tx3);cursor:default">No teachers found</div>'; return; }
+  dd.innerHTML=list.map(t=>`
+    <div class="t-item" onclick="pickTeacher('${esc(t.id)}')">
+      <div class="t-ava">${initials(t.name)}</div>
+      <div><div class="t-nm">${esc(t.name)}</div><div class="t-ts">${t.tsc||'Not TSC registered'}</div></div>
     </div>`).join('');
 }
+function filterTeachers(q){ renderTeacherDD(q); }
+function openDD(){ el('t-dd').classList.add('open'); renderTeacherDD(el('t-srch').value); }
+function schedClose(){ ddCloseT=setTimeout(()=>el('t-dd').classList.remove('open'),200); }
 
-function filterTeachers(q) { renderTeacherDropdown(q); }
-function openDD() { document.getElementById('t-dropdown').classList.add('open'); renderTeacherDropdown(document.getElementById('t-search').value); }
-let closeT;
-function schedClose() { closeT=setTimeout(()=>document.getElementById('t-dropdown').classList.remove('open'),200); }
-
-// ── Remember Me state ──
-let rememberMeOn = localStorage.getItem('et_remember_me') === '1';
-let rememberedId  = localStorage.getItem('et_remembered_id') || null;
-// Flag: true when user is selecting a colleague (bypasses remembered name)
-let selectingColleague = false;
-
-function selectTeacher(id) {
-  clearTimeout(closeT);
-  const t = teachers.find(t=>t.id===id);
-  if (!t) return;
-
-  selectedTeacher = t;
-  document.getElementById('t-dropdown').classList.remove('open');
-  document.getElementById('t-search').value = '';
-
-  // Show selected chip, hide search
-  document.getElementById('sel-chip-ava').textContent  = initials(t.name);
-  document.getElementById('sel-chip-name').textContent = t.name;
-  document.getElementById('sel-chip-tsc').textContent  = t.tsc ? `TSC: ${t.tsc}` : 'Not TSC registered';
-  document.getElementById('sel-chip').classList.add('visible');
-  document.getElementById('search-wrap').style.display = 'none';
-
-  // Show remember-me toggle whenever a teacher is selected
-  document.getElementById('remember-row').style.display = 'flex';
-  syncRememberUI();
-
-  // If remember-me is on, persist this selection
-  if (rememberMeOn) {
-    rememberedId = t.id;
-    localStorage.setItem('et_remembered_id', t.id);
-    // Show remembered banner, hide chip (cleaner UX)
-    showRememberedBanner(t);
-    document.getElementById('sel-chip').classList.remove('visible');
+function pickTeacher(id) {
+  clearTimeout(ddCloseT);
+  const t=teachers.find(t=>t.id===id); if(!t) return;
+  selTeacher=t;
+  el('t-dd').classList.remove('open'); el('t-srch').value='';
+  el('chip-ava').textContent=initials(t.name);
+  el('chip-name').textContent=t.name;
+  el('chip-tsc').textContent=t.tsc?`TSC: ${t.tsc}`:'Not TSC registered';
+  el('sel-chip').classList.add('on');
+  el('srch-wrap').style.display='none';
+  el('rem-row').style.display='flex';
+  syncRemUI();
+  if(remOn && !collegueMode){
+    remId=t.id; localStorage.setItem(remKey(),t.id);
+    showRemBanner(t); el('sel-chip').classList.remove('on');
   }
-
-  selectingColleague = false;
-  updateClockButtons(); drawMap();
-  if (activeSessions[t.id]) startSessionTimer(t);
-  else stopSessionTimer();
+  collegueMode=false;
+  updateBtns(); drawMap();
+  if(sessions[t.id]) startSessTimer(t); else stopSessTimer();
 }
 
-function clearTeacher() {
-  selectedTeacher = null;
-  document.getElementById('sel-chip').classList.remove('visible');
-  document.getElementById('search-wrap').style.display = 'block';
-  document.getElementById('remember-row').style.display = 'none';
-  document.getElementById('remembered-banner').classList.remove('show');
-  stopSessionTimer(); updateClockButtons(); drawMap();
+function clearTeacher(){ selTeacher=null; clearTeacherUI(); updateBtns(); drawMap(); }
+function clearTeacherUI(){
+  el('sel-chip').classList.remove('on');
+  el('srch-wrap').style.display='block';
+  el('rem-row').style.display='none';
+  el('rem-banner').classList.remove('on');
+  stopSessTimer();
 }
 
-// ── Remember Me toggle ──
-function toggleRememberMe() {
-  rememberMeOn = !rememberMeOn;
-  localStorage.setItem('et_remember_me', rememberMeOn ? '1' : '0');
-  syncRememberUI();
-
-  if (rememberMeOn && selectedTeacher) {
-    rememberedId = selectedTeacher.id;
-    localStorage.setItem('et_remembered_id', selectedTeacher.id);
-    showRememberedBanner(selectedTeacher);
-    document.getElementById('sel-chip').classList.remove('visible');
-    showToast('✅ ' + selectedTeacher.name + ' will be remembered on this device');
-  } else {
-    rememberedId = null;
-    localStorage.removeItem('et_remembered_id');
-    document.getElementById('remembered-banner').classList.remove('show');
-    if (selectedTeacher) {
-      document.getElementById('sel-chip').classList.add('visible');
-    }
-    showToast('👋 Remember me turned off');
-  }
+function toggleRemMe(){
+  remOn=!remOn; localStorage.setItem('et_rem',remOn?'1':'0'); syncRemUI();
+  if(remOn && selTeacher){ remId=selTeacher.id; localStorage.setItem(remKey(),selTeacher.id); showRemBanner(selTeacher); el('sel-chip').classList.remove('on'); showToast('✅ '+selTeacher.name+' remembered'); }
+  else { remId=null; localStorage.removeItem(remKey()); el('rem-banner').classList.remove('on'); if(selTeacher) el('sel-chip').classList.add('on'); showToast('👋 Remember me off'); }
 }
-
-// Sync all remember-me UI elements to current state
-function syncRememberUI() {
-  const row  = document.getElementById('remember-row');
-  const tog  = document.getElementById('remember-toggle');
-  const icon = document.getElementById('remember-icon');
-  const sub  = document.getElementById('remember-sub');
-
-  tog.classList.toggle('on', rememberMeOn);
-  row.classList.toggle('on', rememberMeOn);
-  row.setAttribute('aria-checked', rememberMeOn ? 'true' : 'false');
-
-  if (icon) icon.textContent = rememberMeOn ? '🔖' : '🔔';
-  if (sub) sub.textContent = rememberMeOn
-    ? 'Your name is saved on this device'
-    : 'Tap to save your name on this device';
+function syncRemUI(){
+  const tog=el('rem-tog'), row=el('rem-row'), ic=el('rem-ic'), sub=el('rem-sub');
+  tog.classList.toggle('on',remOn); row.classList.toggle('on',remOn);
+  row.setAttribute('aria-checked',remOn?'true':'false');
+  if(ic) ic.textContent=remOn?'🔖':'🔔';
+  if(sub) sub.textContent=remOn?'Your name is saved on this device':'Tap to save your name on this device';
 }
-
-// ── Show the remembered banner ──
-function showRememberedBanner(t) {
-  document.getElementById('rb-ava').textContent  = initials(t.name);
-  document.getElementById('rb-name').textContent = t.name;
-  document.getElementById('remembered-banner').classList.add('show');
+function showRemBanner(t){ el('rb-ava').textContent=initials(t.name); el('rb-name').textContent=t.name; el('rem-banner').classList.add('on'); }
+function restoreRemembered(){
+  remId=localStorage.getItem(remKey());
+  if(!remOn||!remId) return;
+  const t=teachers.find(t=>t.id===remId); if(!t) return;
+  selTeacher=t; showRemBanner(t);
+  el('srch-wrap').style.display='none'; el('rem-row').style.display='flex';
+  syncRemUI(); updateBtns(); drawMap();
+  if(sessions[t.id]) startSessTimer(t);
 }
-
-// ── Restore remembered teacher on app load ──
-function restoreRememberedTeacher() {
-  if (!rememberMeOn || !rememberedId) return;
-  const t = teachers.find(t => t.id === rememberedId);
-  if (!t) return;
-
-  selectedTeacher = t;
-  showRememberedBanner(t);
-  document.getElementById('search-wrap').style.display = 'none';
-  document.getElementById('remember-row').style.display = 'flex';
-  syncRememberUI();
-  updateClockButtons(); drawMap();
-  if (activeSessions[t.id]) startSessionTimer(t);
+function promptColleague(){
+  const t=teachers.find(t=>t.id===remId);
+  el('coll-txt').innerHTML=t?`You are remembered as <strong style="color:var(--teal)">${esc(t.name)}</strong>.<br>Clocking for yourself or a colleague?`:'Clocking for yourself or a colleague?';
+  el('coll-modal').classList.add('open');
 }
+function collSelf(){ closeCollModal(); selTeacher=null; el('rem-banner').classList.remove('on'); el('sel-chip').classList.remove('on'); el('srch-wrap').style.display='block'; el('rem-row').style.display='none'; collegueMode=false; stopSessTimer(); updateBtns(); drawMap(); setTimeout(()=>el('t-srch').focus(),150); }
+function collColleague(){ closeCollModal(); collegueMode=true; el('rem-banner').classList.remove('on'); el('sel-chip').classList.remove('on'); el('srch-wrap').style.display='block'; el('pick-lbl').textContent="👥 Select Colleague's Name"; selTeacher=null; stopSessTimer(); updateBtns(); drawMap(); setTimeout(()=>el('t-srch').focus(),150); }
+function closeCollModal(){ el('coll-modal').classList.remove('open'); }
 
-// ── "Switch" button on remembered banner — ask if colleague ──
-function promptColleague() {
-  const remT = teachers.find(t => t.id === rememberedId);
-  const txt = document.getElementById('colleague-modal-text');
-  txt.innerHTML = remT
-    ? `You are remembered as <strong style="color:var(--teal)">${esc(remT.name)}</strong>.<br>Are you switching to your own name or clocking for a colleague?`
-    : `Are you clocking in/out for yourself or a colleague?`;
-  document.getElementById('colleague-modal').classList.add('open');
-}
-
-// User confirms it's themselves — show search to re-select their name
-function colleagueSelf() {
-  closeColleagueModal();
-  // Clear current selection and show search so they can find themselves
-  selectedTeacher = null;
-  document.getElementById('remembered-banner').classList.remove('show');
-  document.getElementById('sel-chip').classList.remove('visible');
-  document.getElementById('search-wrap').style.display = 'block';
-  document.getElementById('remember-row').style.display = 'none';
-  selectingColleague = false;
-  stopSessionTimer(); updateClockButtons(); drawMap();
-  setTimeout(() => document.getElementById('t-search').focus(), 150);
-}
-
-// User wants to clock for a colleague — show search, disable remember-me for this selection
-function colleagueColleague() {
-  closeColleagueModal();
-  selectingColleague = true;
-  // Temporarily show chip/search without changing remembered name
-  document.getElementById('remembered-banner').classList.remove('show');
-  document.getElementById('sel-chip').classList.remove('visible');
-  document.getElementById('search-wrap').style.display = 'block';
-  // Change picker label to make intent clear
-  document.querySelector('.picker-label').textContent = "👥 Select Colleague's Name";
-  selectedTeacher = null;
-  stopSessionTimer(); updateClockButtons(); drawMap();
-  setTimeout(() => document.getElementById('t-search').focus(), 150);
-}
-
-function closeColleagueModal() {
-  document.getElementById('colleague-modal').classList.remove('open');
-}
-
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  CLOCK BUTTONS
-// ═══════════════════════════════════════════════════════
-function updateClockButtons() {
-  const bi=document.getElementById('btn-in'), bo=document.getElementById('btn-out');
-  const si=document.getElementById('sub-in'),  so=document.getElementById('sub-out');
-  bi.className='clock-btn'; bo.className='clock-btn';
-  bi.disabled=true; bo.disabled=true;
-
-  if (!selectedTeacher) { si.textContent=so.textContent='select name first'; return; }
-  if (!settings.lat||!settings.lng) { si.textContent=so.textContent='school location not set'; return; }
-  const clocked = !!activeSessions[selectedTeacher.id];
-  if (!isInside) {
-    si.textContent=`outside ${settings.radius}m zone`; so.textContent=`outside ${settings.radius}m zone`;
-    if (clocked) { bo.className='clock-btn can-out'; bo.disabled=false; so.textContent='clock out'; }
+// ─────────────────────────────────────────────────────
+function updateBtns(){
+  const bi=el('btn-in'), bo=el('btn-out'), si=el('sub-in'), so=el('sub-out');
+  bi.className='ck-btn'; bo.className='ck-btn'; bi.disabled=true; bo.disabled=true;
+  if(!selTeacher){ si.textContent=so.textContent='select name first'; return; }
+  if(!settings.lat||!settings.lng){ si.textContent=so.textContent='school location not set'; return; }
+  const clocked=!!sessions[selTeacher.id];
+  if(!isInside){
+    si.textContent=so.textContent=`outside ${settings.radius}m zone`;
+    if(clocked){ bo.className='ck-btn can-out'; bo.disabled=false; so.textContent='clock out'; }
     return;
   }
-  if (!clocked) {
-    bi.className='clock-btn can-in'; bi.disabled=false; si.textContent=settings.schoolName||'school zone';
-    so.textContent='not clocked in';
-  } else {
-    bo.className='clock-btn can-out'; bo.disabled=false; so.textContent=settings.schoolName||'school zone';
-    si.textContent='already clocked in';
-  }
+  if(!clocked){ bi.className='ck-btn can-in'; bi.disabled=false; si.textContent=settings.schoolName||'school zone'; so.textContent='not clocked in'; }
+  else { bo.className='ck-btn can-out'; bo.disabled=false; so.textContent=settings.schoolName||'school zone'; si.textContent='already clocked in'; }
 }
 
-async function doClockIn() {
-  const t=selectedTeacher;
-  if (!t||activeSessions[t.id]) return;
-
-  // ── Device limit: max 2 teachers per device per day ──
-  const deviceId = getDeviceId();
-  const today = new Date().toDateString();
-  const todayDeviceIns = records.filter(r =>
-    r.type==='in' &&
-    r.deviceId===deviceId &&
-    new Date(r.ts).toDateString()===today
-  );
-  // Count unique teachers clocked in from this device today
-  const uniqueTeachersFromDevice = new Set(todayDeviceIns.map(r=>r.teacherId));
-  // If this teacher is new to this device today and limit is reached
-  if (!uniqueTeachersFromDevice.has(t.id) && uniqueTeachersFromDevice.size >= 2) {
-    showToast('⛔ This device has already clocked in 2 teachers today');
-    showDeviceLimitModal();
-    return;
-  }
-
-  const now=new Date();
-  const rec={id:uid(),teacherId:t.id,type:'in',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng,deviceId};
-  records.push(rec); activeSessions[t.id]=now.toISOString();
-  saveLocal();
-  if (DB_MODE==='firebase') { await fbAddRecord(rec); await fbSetSession(t.id,now.toISOString()); }
-  startSessionTimer(t); updateClockButtons(); renderTodayLog();
+async function doClockIn(){
+  const t=selTeacher; if(!t||sessions[t.id]) return;
+  const devId=getDevId(), today=new Date().toDateString();
+  const todayIns=records.filter(r=>r.type==='in'&&r.devId===devId&&new Date(r.ts).toDateString()===today);
+  const uniq=new Set(todayIns.map(r=>r.teacherId));
+  if(!uniq.has(t.id)&&uniq.size>=2){ showToast('⛔ Device limit: 2 teachers/device/day'); el('dev-limit-modal').classList.add('open'); return; }
+  const now=new Date(), rec={id:uid(),teacherId:t.id,type:'in',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng,devId};
+  records.push(rec); sessions[t.id]=now.toISOString(); saveLocal();
+  if(DB==='firebase'){ await fbAddRecord(rec); await fbSetSession(t.id,now.toISOString()); }
+  startSessTimer(t); updateBtns(); renderTodayLog();
   showToast(`🟢 ${t.name} clocked in`);
 }
-
-async function doClockOut(auto) {
-  const t=selectedTeacher;
-  if (!t||!activeSessions[t.id]) return;
-  const now=new Date();
-  const rec={id:uid(),teacherId:t.id,type:'out',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng};
-  records.push(rec); delete activeSessions[t.id];
-  saveLocal();
-  if (DB_MODE==='firebase') { await fbAddRecord(rec); await fbSetSession(t.id,null); }
-  stopSessionTimer(); updateClockButtons(); renderTodayLog();
+async function doClockOut(auto){
+  const t=selTeacher; if(!t||!sessions[t.id]) return;
+  const now=new Date(), rec={id:uid(),teacherId:t.id,type:'out',ts:now.toISOString(),lat:userPos?.lat,lng:userPos?.lng};
+  records.push(rec); delete sessions[t.id]; saveLocal();
+  if(DB==='firebase'){ await fbAddRecord(rec); await fbSetSession(t.id,null); }
+  stopSessTimer(); updateBtns(); renderTodayLog();
   showToast(auto?`🔴 ${t.name} auto clocked out`:`🔴 ${t.name} clocked out`);
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  SESSION TIMER
-// ═══════════════════════════════════════════════════════
-function startSessionTimer(t) {
-  stopSessionTimer();
-  document.getElementById('session-banner').classList.add('active');
-  document.getElementById('session-who').textContent = t.name;
-  sessionInterval = setInterval(()=>{
-    if (!activeSessions[t.id]) { stopSessionTimer(); return; }
-    const e=Math.floor((Date.now()-new Date(activeSessions[t.id]))/1000);
-    document.getElementById('session-val').textContent=fmtSec(e);
-  },1000);
+// ─────────────────────────────────────────────────────
+function startSessTimer(t){
+  stopSessTimer(); el('sess-bn').classList.add('on'); el('sess-who').textContent=t.name;
+  sessTimer=setInterval(()=>{ if(!sessions[t.id]){stopSessTimer();return;} const e=Math.floor((Date.now()-new Date(sessions[t.id]))/1000); el('sess-val').textContent=fmtSec(e); },1000);
 }
-function stopSessionTimer() {
-  clearInterval(sessionInterval);
-  document.getElementById('session-banner').classList.remove('active');
-  document.getElementById('session-val').textContent='00:00:00';
-}
+function stopSessTimer(){ clearInterval(sessTimer); el('sess-bn').classList.remove('on'); el('sess-val').textContent='00:00:00'; }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  TODAY LOG
-// ═══════════════════════════════════════════════════════
-function renderTodayLog() {
+// ─────────────────────────────────────────────────────
+function renderTodayLog(){
   const today=new Date().toDateString();
-  const recs=records.filter(r=>new Date(r.ts).toDateString()===today)
-    .sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  const el=document.getElementById('today-log');
-  if (!recs.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records today yet</div></div>'; return; }
-  el.innerHTML=recs.map(r=>{
+  const recs=records.filter(r=>new Date(r.ts).toDateString()===today).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const container=el('today-log');
+  if(!recs.length){ container.innerHTML='<div class="empty"><div class="empty-ic">📭</div><div class="empty-tx">No records today yet</div></div>'; return; }
+  container.innerHTML=recs.map(r=>{
     const t=teachers.find(t=>t.id===r.teacherId);
-    return `<div class="log-card">
-      <div class="log-card-ava ${r.type}">${t?initials(t.name):'?'}</div>
-      <div class="log-info">
-        <div class="log-name">${esc(t?t.name:'Unknown Teacher')}</div>
-        <div class="log-time">${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div>
-      <span class="log-badge ${r.type}">${r.type.toUpperCase()}</span>
-    </div>`;
+    return `<div class="log-card"><div class="lc-ava ${r.type}">${t?initials(t.name):'?'}</div><div class="lc-info"><div class="lc-name">${esc(t?t.name:'Unknown')}</div><div class="lc-time">${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div></div><span class="log-badge ${r.type}">${r.type.toUpperCase()}</span></div>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  ADMIN AUTH
-// ═══════════════════════════════════════════════════════
-function requireAdmin() {
-  if (adminLoggedIn) { goPage('admin'); return; }
-  document.getElementById('login-screen').classList.add('show');
-  setTimeout(()=>document.getElementById('pin-input').focus(),100);
+// ─────────────────────────────────────────────────────
+function requireAdmin(){
+  if(adminOK){ goPage('admin'); return; }
+  el('admin-login-sub').textContent='Enter the admin PIN for '+(settings.schoolName||'this school');
+  el('admin-err').style.display='none';
+  el('admin-pin').value='';
+  el('admin-login').classList.add('open');
+  setTimeout(()=>el('admin-pin').focus(),150);
 }
-function doLogin() {
-  const pin=document.getElementById('pin-input').value;
-  if (pin===settings.pin) {
-    document.getElementById('login-screen').classList.remove('show');
-    document.getElementById('pin-input').value='';
-    document.getElementById('login-err').style.display='none';
-    adminLoggedIn=true; goPage('admin'); refreshAdminViews();
+function doAdminLogin(){
+  if(el('admin-pin').value===settings.pin){
+    el('admin-login').classList.remove('open'); el('admin-pin').value='';
+    el('admin-err').style.display='none';
+    adminOK=true; goPage('admin'); refreshAdmin();
   } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('pin-input').value='';
+    el('admin-err').style.display='block'; el('admin-pin').value='';
   }
 }
-function closeLogin() { document.getElementById('login-screen').classList.remove('show'); document.getElementById('pin-input').value=''; }
+function closeAdminLogin(){ el('admin-login').classList.remove('open'); el('admin-pin').value=''; }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  ADMIN SECTIONS
-// ═══════════════════════════════════════════════════════
-function aNav(sec, btn) {
-  document.querySelectorAll('.a-tab').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.a-section').forEach(s=>s.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-  document.getElementById(`asec-${sec}`).classList.add('active');
-  if (sec==='teachers') renderTeachersList();
-  if (sec==='reports')  { populateRptFilter(); renderReport(); }
-  if (sec==='individual') populateIndSel();
-  if (sec==='overview') renderOverview();
+// ─────────────────────────────────────────────────────
+function aNav(sec, btn){
+  el('a-tabs').querySelectorAll('.a-tab').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#page-admin .a-sec').forEach(s=>s.classList.remove('on'));
+  btn.classList.add('on');
+  el('as-'+sec).classList.add('on');
+  if(sec==='teachers')   renderTeachersList();
+  if(sec==='reports')    { populateRptFilter(); renderReport(); }
+  if(sec==='individual') populateIndSel();
+  if(sec==='overview')   renderOverview();
 }
+function refreshAdmin(){ renderOverview(); renderTeachersList(); populateRptFilter(); populateIndSel(); const a=document.querySelector('#page-admin .a-sec.on'); if(a?.id==='as-reports') renderReport(); if(a?.id==='as-individual') renderIndividual(); }
 
-function refreshAdminViews() {
-  renderOverview(); renderTeachersList(); populateRptFilter(); populateIndSel();
-  const active = document.querySelector('.a-section.active');
-  if (active?.id==='asec-reports') renderReport();
-  if (active?.id==='asec-individual') renderIndividual();
-}
-
-function renderOverview() {
+function renderOverview(){
   const today=new Date().toDateString();
-  const todayIns=records.filter(r=>new Date(r.ts).toDateString()===today && r.type==='in');
-  const weekStart=new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay()); weekStart.setHours(0,0,0,0);
-  const weekIns=records.filter(r=>new Date(r.ts)>=weekStart && r.type==='in');
-  const nowIn=Object.keys(activeSessions).length;
-  document.getElementById('stat-teachers').textContent=teachers.length;
-  document.getElementById('stat-today').textContent=todayIns.length;
-  document.getElementById('stat-present').textContent=nowIn;
-  document.getElementById('stat-week').textContent=weekIns.length;
-
+  const todayIns=records.filter(r=>new Date(r.ts).toDateString()===today&&r.type==='in');
+  const wk=new Date(); wk.setDate(wk.getDate()-wk.getDay()); wk.setHours(0,0,0,0);
+  el('st-teachers').textContent=teachers.length;
+  el('st-today').textContent=todayIns.length;
+  el('st-in').textContent=Object.keys(sessions).length;
+  el('st-week').textContent=records.filter(r=>new Date(r.ts)>=wk&&r.type==='in').length;
   const recent=records.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,10);
-  const el=document.getElementById('admin-recent-log');
-  if (!recent.length) { el.innerHTML='<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records yet</div></div>'; return; }
-  el.innerHTML=recent.map(r=>{
-    const t=teachers.find(t=>t.id===r.teacherId);
-    return `<div class="log-card">
-      <div class="log-card-ava ${r.type}">${t?initials(t.name):'?'}</div>
-      <div class="log-info">
-        <div class="log-name">${esc(t?t.name:'Unknown')}</div>
-        <div class="log-time">${new Date(r.ts).toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})} · ${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div>
-      <span class="log-badge ${r.type}">${r.type.toUpperCase()}</span>
-    </div>`;
-  }).join('');
+  const c=el('admin-log');
+  if(!recent.length){ c.innerHTML='<div class="empty"><div class="empty-ic">📭</div><div class="empty-tx">No records yet</div></div>'; return; }
+  c.innerHTML=recent.map(r=>{ const t=teachers.find(t=>t.id===r.teacherId); return `<div class="log-card"><div class="lc-ava ${r.type}">${t?initials(t.name):'?'}</div><div class="lc-info"><div class="lc-name">${esc(t?t.name:'Unknown')}</div><div class="lc-time">${new Date(r.ts).toLocaleDateString('en-KE',{weekday:'short',day:'numeric',month:'short'})} · ${new Date(r.ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'})}</div></div><span class="log-badge ${r.type}">${r.type.toUpperCase()}</span></div>`; }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  TEACHER MANAGEMENT
-// ═══════════════════════════════════════════════════════
-function toggleAddForm() {
-  const w=document.getElementById('add-form-wrap');
-  w.style.display=w.style.display==='none'?'block':'none';
-}
-
-async function addTeacher() {
-  const name=document.getElementById('new-name').value.trim();
-  const tsc=document.getElementById('new-tsc').value.trim();
-  if (!name) { showToast('⚠️ Name is required'); return; }
-  if (teachers.find(t=>t.name.toLowerCase()===name.toLowerCase())) { showToast('⚠️ Teacher already exists'); return; }
-  const t={id:uid(), name, tsc, addedAt:new Date().toISOString()};
+// ─────────────────────────────────────────────────────
+function toggleAddForm(){ const w=el('add-form'); w.style.display=w.style.display==='none'?'block':'none'; }
+async function addTeacher(){
+  const name=el('new-name').value.trim(), tsc=el('new-tsc').value.trim();
+  if(!name){ showToast('⚠️ Name required'); return; }
+  if(teachers.find(t=>t.name.toLowerCase()===name.toLowerCase())){ showToast('⚠️ Teacher already exists'); return; }
+  const t={id:uid(),name,tsc,addedAt:new Date().toISOString()};
   teachers.push(t); saveLocal();
-  if (DB_MODE==='firebase') await fbAddTeacher(t);
-  document.getElementById('new-name').value=''; document.getElementById('new-tsc').value='';
-  toggleAddForm(); renderTeachersList(); renderTeacherDropdown('');
+  if(DB==='firebase') await fbSaveTeacher(t);
+  el('new-name').value=''; el('new-tsc').value='';
+  toggleAddForm(); renderTeachersList(); renderTeacherDD('');
   showToast(`✅ ${name} added`);
 }
-
-function renderTeachersList() {
-  const el=document.getElementById('teachers-list');
-  if (!teachers.length) { el.innerHTML='<div class="empty"><div class="empty-icon">👥</div><div class="empty-text">No teachers added yet</div></div>'; return; }
-  el.innerHTML=teachers.map(t=>`
-    <div class="teacher-item">
-      <div class="t-ava">${initials(t.name)}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="t-name">${esc(t.name)}</div>
-        <div class="t-meta">${t.tsc?t.tsc:'Not TSC registered'} · ${records.filter(r=>r.teacherId===t.id&&r.type==='in').length} sessions</div>
-      </div>
-      <button class="btn btn-danger btn-sm" onclick="openDelModal('${t.id}')">Delete</button>
-    </div>`).join('');
+function renderTeachersList(){
+  const c=el('teachers-list');
+  if(!teachers.length){ c.innerHTML='<div class="empty"><div class="empty-ic">👥</div><div class="empty-tx">No teachers yet</div></div>'; return; }
+  c.innerHTML=teachers.map(t=>`<div class="t-row"><div class="t-av">${initials(t.name)}</div><div style="flex:1;min-width:0"><div class="t-nme">${esc(t.name)}</div><div class="t-met">${t.tsc||'No TSC'} · ${records.filter(r=>r.teacherId===t.id&&r.type==='in').length} sessions</div></div><button class="btn btn-d btn-sm" onclick="openDelModal('${t.id}')">Delete</button></div>`).join('');
 }
-
-function openDelModal(id) {
-  pendingDeleteId=id;
-  const t=teachers.find(t=>t.id===id);
-  document.getElementById('del-modal-txt').textContent=`Delete "${t?.name}"? All their ${records.filter(r=>r.teacherId===id).length} records will also be deleted.`;
-  document.getElementById('del-modal').classList.add('open');
-}
-function closeDelModal() { document.getElementById('del-modal').classList.remove('open'); pendingDeleteId=null; }
-
-async function confirmDelete() {
-  if (!pendingDeleteId) return;
-  const t=teachers.find(t=>t.id===pendingDeleteId);
-  teachers=teachers.filter(t=>t.id!==pendingDeleteId);
-  records=records.filter(r=>r.teacherId!==pendingDeleteId);
-  delete activeSessions[pendingDeleteId];
-  saveLocal();
-  if (DB_MODE==='firebase') await fbDeleteTeacher(pendingDeleteId);
-  if (selectedTeacher?.id===pendingDeleteId) clearTeacher();
-  closeDelModal(); renderTeachersList(); renderTeacherDropdown('');
+function openDelModal(id){ pendDelId=id; const t=teachers.find(t=>t.id===id); el('del-txt').textContent=`Delete "${t?.name}"? All their ${records.filter(r=>r.teacherId===id).length} records will be deleted too.`; el('del-modal').classList.add('open'); }
+function closeDelModal(){ el('del-modal').classList.remove('open'); pendDelId=null; }
+async function confirmDelete(){
+  if(!pendDelId) return;
+  const t=teachers.find(t=>t.id===pendDelId);
+  teachers=teachers.filter(t=>t.id!==pendDelId);
+  records=records.filter(r=>r.teacherId!==pendDelId);
+  delete sessions[pendDelId]; saveLocal();
+  if(DB==='firebase') await fbDeleteTeacher(pendDelId);
+  if(selTeacher?.id===pendDelId) clearTeacher();
+  closeDelModal(); renderTeachersList(); renderTeacherDD('');
   showToast(`🗑 ${t?.name} deleted`);
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  REPORTS
-// ═══════════════════════════════════════════════════════
-function populateRptFilter() {
-  const sel=document.getElementById('rpt-teacher');
+// ─────────────────────────────────────────────────────
+function populateRptFilter(){
+  const sel=el('rpt-teacher'), cur=sel.value;
   sel.innerHTML='<option value="all">All Teachers</option>'+teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  if(cur) sel.value=cur;
 }
-
-function getFilteredRecs() {
-  const period=document.getElementById('rpt-period').value;
-  const tid=document.getElementById('rpt-teacher').value;
-  const now=new Date(); let start;
-  if (period==='daily') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  else if (period==='weekly') { start=new Date(now); start.setDate(now.getDate()-now.getDay()); start.setHours(0,0,0,0); }
+function getFilteredRecs(){
+  const period=el('rpt-period').value, tid=el('rpt-teacher').value, now=new Date(); let start;
+  if(period==='daily') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  else if(period==='weekly'){ start=new Date(now); start.setDate(now.getDate()-now.getDay()); start.setHours(0,0,0,0); }
   else start=new Date(now.getFullYear(),now.getMonth(),1);
-  return records.filter(r=>{
-    if (new Date(r.ts)<start) return false;
-    if (tid!=='all'&&r.teacherId!==tid) return false;
-    return true;
-  }).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  return records.filter(r=>new Date(r.ts)>=start&&(tid==='all'||r.teacherId===tid)).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
 }
-
-function buildRows(recs) {
-  const rows=[]; const map={};
-  recs.forEach(r=>{
-    const k=`${r.teacherId}_${new Date(r.ts).toDateString()}`;
-    if (!map[k]) map[k]=[];
-    map[k].push(r);
-  });
+function buildRows(recs){
+  const map={};
+  recs.forEach(r=>{ const k=`${r.teacherId}_${new Date(r.ts).toDateString()}`; if(!map[k]) map[k]=[]; map[k].push(r); });
+  const rows=[];
   Object.values(map).forEach(dr=>{
     const ins=dr.filter(r=>r.type==='in').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     const outs=dr.filter(r=>r.type==='out').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     const t=teachers.find(t=>t.id===dr[0].teacherId);
     const n=Math.max(ins.length,outs.length);
-    for (let i=0;i<n;i++) {
+    for(let i=0;i<n;i++){
       const ir=ins[i],or=outs[i];
       rows.push({name:t?t.name:'Unknown',tsc:t?.tsc||'',
         date:new Date((ir||or).ts).toLocaleDateString('en-KE'),
@@ -2133,431 +1464,145 @@ function buildRows(recs) {
   });
   return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
 }
-
-function renderReport() {
-  const rows=buildRows(getFilteredRecs());
-  const body=document.getElementById('rpt-body'), empty=document.getElementById('rpt-empty');
-  if (!rows.length) { body.innerHTML=''; empty.style.display='block'; return; }
+function renderReport(){
+  const rows=buildRows(getFilteredRecs()), body=el('rpt-body'), empty=el('rpt-empty');
+  if(!rows.length){ body.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
-  body.innerHTML=rows.map(r=>`<tr>
-    <td style="font-weight:700;white-space:nowrap">${esc(r.name)}</td>
-    <td>${r.tsc?`<span class="tsc-badge">${esc(r.tsc)}</span>`:'<span class="unr-badge">—</span>'}</td>
-    <td style="font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap">${r.date}</td>
-    <td style="color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:11px;">${r.in}</td>
-    <td style="color:var(--rose);font-family:'JetBrains Mono',monospace;font-size:11px;">${r.out}</td>
-    <td style="font-family:'JetBrains Mono',monospace;font-size:11px;">${r.dur}</td>
-  </tr>`).join('');
+  body.innerHTML=rows.map(r=>`<tr><td style="font-weight:700;white-space:nowrap">${esc(r.name)}</td><td>${r.tsc?`<span class="tsc-b">${esc(r.tsc)}</span>`:'<span class="unr-b">—</span>'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap">${r.date}</td><td style="color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:11px">${r.in}</td><td style="color:var(--rose);font-family:'JetBrains Mono',monospace;font-size:11px">${r.out}</td><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.dur}</td></tr>`).join('');
 }
-
-function exportPDF() {
+function exportPDF(){
   const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const rows=buildRows(getFilteredRecs());
-  const period={'daily':'Daily','weekly':'Weekly','monthly':'Monthly'}[document.getElementById('rpt-period').value];
-  const W=297, H=210;
-  // White background
+  const pEl=el('rpt-period'), period={'daily':'Daily','weekly':'Weekly','monthly':'Monthly'}[pEl.value];
+  const W=297,H=210;
   doc.setFillColor(255,255,255); doc.rect(0,0,W,H,'F');
-  // Teal header bar
   doc.setFillColor(15,212,192); doc.rect(0,0,W,22,'F');
   doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(11,17,32);
-  doc.text(settings.schoolName||'School Attendance', 14, 14);
+  doc.text(settings.schoolName||'School Attendance',14,14);
   doc.setFontSize(9); doc.setFont('helvetica','normal');
-  doc.text(`${period} Report · ${new Date().toLocaleString('en-KE')}`, 14, 20);
-  // Powered by — right side of header
+  doc.text(`${period} Report · ${new Date().toLocaleString('en-KE')}`,14,20);
   doc.setFontSize(7); doc.setTextColor(30,50,40);
-  doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, 14, {align:'right'});
-  if (!rows.length) {
-    doc.setTextColor(100,100,100); doc.setFontSize(11);
-    doc.text('No records for the selected period.', 14, 40);
-  } else {
-    doc.autoTable({startY:27,
-      head:[['Teacher','TSC Number','Date','Clock In','Clock Out','Duration']],
-      body:rows.map(r=>[r.name,r.tsc||'—',r.date,r.in,r.out,r.dur]),
+  doc.text('Powered by Mr. Saisi Nyongesa Sammy',W-14,14,{align:'right'});
+  if(!rows.length){ doc.setTextColor(100,100,100); doc.setFontSize(11); doc.text('No records for the selected period.',14,40); }
+  else {
+    doc.autoTable({startY:27,head:[['Teacher','TSC','Date','In','Out','Duration']],body:rows.map(r=>[r.name,r.tsc||'—',r.date,r.in,r.out,r.dur]),
       styles:{fontSize:9,cellPadding:3,textColor:[30,40,60],fillColor:[255,255,255]},
       headStyles:{fillColor:[11,17,32],textColor:[15,212,192],fontStyle:'bold'},
       alternateRowStyles:{fillColor:[245,250,252]},
       bodyStyles:{fillColor:[255,255,255],textColor:[30,40,60]},
-      footStyles:{fillColor:[240,250,248],textColor:[30,100,90]},
       theme:'grid',
-      didDrawPage:(data)=>{
-        const pg=doc.internal.getCurrentPageInfo().pageNumber;
-        const total=doc.internal.getNumberOfPages();
-        doc.setFontSize(7); doc.setTextColor(150,150,150);
-        doc.text(`Page ${pg} of ${total} · EduTrack School Attendance`, W/2, H-5, {align:'center'});
-        doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, H-5, {align:'right'});
-      }
+      didDrawPage:()=>{ const pg=doc.internal.getCurrentPageInfo().pageNumber,total=doc.internal.getNumberOfPages(); doc.setFontSize(7); doc.setTextColor(150,150,150); doc.text(`Page ${pg} of ${total}`,W/2,H-5,{align:'center'}); doc.text('Powered by Mr. Saisi Nyongesa Sammy',W-14,H-5,{align:'right'}); }
     });
   }
-  doc.save(`${(settings.schoolName||'attendance').replace(/\s+/g,'_')}_${period.toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`);
+  doc.save(`${(settings.schoolName||'attendance').replace(/\s+/g,'_')}_${pEl.value}_${new Date().toISOString().slice(0,10)}.pdf`);
   showToast('📄 PDF exported');
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  INDIVIDUAL STATS
-// ═══════════════════════════════════════════════════════
-function populateIndSel() {
-  const sel=document.getElementById('ind-sel');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— Choose teacher —</option>'+teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
-  if (cur) sel.value=cur;
-}
-
-function renderIndividual() {
-  const id=document.getElementById('ind-sel').value;
-  const el=document.getElementById('ind-content');
-  if (!id) { el.innerHTML='<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Select a teacher</div></div>'; return; }
+// ─────────────────────────────────────────────────────
+function populateIndSel(){ const s=el('ind-sel'),c=s.value; s.innerHTML='<option value="">— Choose teacher —</option>'+teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join(''); if(c) s.value=c; }
+function renderIndividual(){
+  const id=el('ind-sel').value, c=el('ind-content');
+  if(!id){ c.innerHTML='<div class="empty"><div class="empty-ic">📈</div><div class="empty-tx">Select a teacher</div></div>'; return; }
   const t=teachers.find(t=>t.id===id);
-  const tRecs=records.filter(r=>r.teacherId===id);
-  const ins=tRecs.filter(r=>r.type==='in').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
-  const outs=tRecs.filter(r=>r.type==='out').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
-  const pairs=Math.min(ins.length,outs.length);
-  let totalMs=0;
-  for(let i=0;i<pairs;i++) totalMs+=new Date(outs[i].ts)-new Date(ins[i].ts);
-
-  const days=[];
-  for(let i=6;i>=0;i--) {
-    const d=new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
-    const lbl=d.toLocaleDateString('en-KE',{weekday:'short',day:'numeric'});
-    const cnt=ins.filter(r=>{const rd=new Date(r.ts);rd.setHours(0,0,0,0);return rd.getTime()===d.getTime();}).length;
-    days.push({lbl,cnt});
-  }
+  const ins=records.filter(r=>r.teacherId===id&&r.type==='in').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const outs=records.filter(r=>r.teacherId===id&&r.type==='out').sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const pairs=Math.min(ins.length,outs.length); let totMs=0;
+  for(let i=0;i<pairs;i++) totMs+=new Date(outs[i].ts)-new Date(ins[i].ts);
+  const days=[]; for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0); const lbl=d.toLocaleDateString('en-KE',{weekday:'short',day:'numeric'}); const cnt=ins.filter(r=>{ const rd=new Date(r.ts); rd.setHours(0,0,0,0); return rd.getTime()===d.getTime(); }).length; days.push({lbl,cnt}); }
   const maxC=Math.max(...days.map(d=>d.cnt),1);
-
-  el.innerHTML=`
-    <div class="stats-row">
-      <div class="stat-pill"><div class="stat-num">${ins.length}</div><div class="stat-lbl">Check-ins</div></div>
-      <div class="stat-pill"><div class="stat-num">${pairs}</div><div class="stat-lbl">Full Sessions</div></div>
-      <div class="stat-pill"><div class="stat-num" style="font-size:18px;">${fmtMs(totalMs,true)}</div><div class="stat-lbl">Total Time</div></div>
-      <div class="stat-pill"><div class="stat-num" style="font-size:18px;">${pairs?fmtMs(totalMs/pairs,true):'—'}</div><div class="stat-lbl">Avg Session</div></div>
-    </div>
-    <div class="a-card" style="margin-bottom:16px;">
-      <div class="a-card-head"><span class="a-card-title">Last 7 Days</span></div>
-      <div class="a-card-body">
-        ${days.map(d=>`
-          <div class="ind-bar-row">
-            <div class="ind-bar-lbl">${d.lbl}</div>
-            <div class="ind-bar-wrap"><div class="ind-bar-fill" style="width:${(d.cnt/maxC)*100}%"></div></div>
-            <div class="ind-bar-count">${d.cnt}</div>
-          </div>`).join('')}
-      </div>
-    </div>
-    <button class="btn btn-teal btn-sm" onclick="exportIndPDF('${id}')">⬇ Export Individual PDF</button>`;
+  c.innerHTML=`<div class="stats"><div class="stat-p"><div class="stat-n">${ins.length}</div><div class="stat-l">Check-ins</div></div><div class="stat-p"><div class="stat-n">${pairs}</div><div class="stat-l">Full Sessions</div></div><div class="stat-p"><div class="stat-n" style="font-size:18px">${fmtMs(totMs,true)}</div><div class="stat-l">Total Time</div></div><div class="stat-p"><div class="stat-n" style="font-size:18px">${pairs?fmtMs(totMs/pairs,true):'—'}</div><div class="stat-l">Avg Session</div></div></div><div class="card" style="margin-bottom:16px"><div class="card-head"><span class="card-ttl">Last 7 Days</span></div><div class="card-body">${days.map(d=>`<div class="ind-row"><div class="ind-lbl">${d.lbl}</div><div class="ind-wrap"><div class="ind-fill" style="width:${(d.cnt/maxC)*100}%"></div></div><div class="ind-cnt">${d.cnt}</div></div>`).join('')}</div></div><button class="btn btn-t btn-sm" onclick="exportIndPDF('${id}')">⬇ Export Individual PDF</button>`;
 }
-
-function exportIndPDF(id) {
+function exportIndPDF(id){
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
-  const t=teachers.find(t=>t.id===id);
-  const rows=buildRows(records.filter(r=>r.teacherId===id));
-  const W=210, H=297;
-  // White background
+  const t=teachers.find(t=>t.id===id), rows=buildRows(records.filter(r=>r.teacherId===id));
+  const W=210,H=297;
   doc.setFillColor(255,255,255); doc.rect(0,0,W,H,'F');
-  // Teal header bar
   doc.setFillColor(15,212,192); doc.rect(0,0,W,26,'F');
   doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(11,17,32);
-  doc.text(settings.schoolName||'School Attendance', 14, 12);
-  doc.setFontSize(11); doc.setTextColor(20,60,50);
-  doc.text(t?.name||'Teacher Report', 14, 20);
-  // Powered by — right side
-  doc.setFontSize(7); doc.setTextColor(30,50,40);
-  doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, 12, {align:'right'});
-  let y=32;
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,100,120);
-  if (t?.tsc) { doc.text(`TSC Number: ${t.tsc}`, 14, y); y+=6; }
-  doc.text(`Report generated: ${new Date().toLocaleString('en-KE')}`, 14, y); y+=8;
-  if (!rows.length) { doc.setTextColor(150,150,150); doc.text('No records found.', 14, y+10); }
-  else {
-    doc.autoTable({startY:y,
-      head:[['Date','Clock In','Clock Out','Duration']],
-      body:rows.map(r=>[r.date,r.in,r.out,r.dur]),
-      styles:{fontSize:9,cellPadding:3,textColor:[30,40,60],fillColor:[255,255,255]},
-      headStyles:{fillColor:[11,17,32],textColor:[15,212,192],fontStyle:'bold'},
-      alternateRowStyles:{fillColor:[245,250,252]},
-      bodyStyles:{fillColor:[255,255,255],textColor:[30,40,60]},
-      theme:'grid',
-      didDrawPage:(data)=>{
-        const pg=doc.internal.getCurrentPageInfo().pageNumber;
-        const total=doc.internal.getNumberOfPages();
-        doc.setFontSize(7); doc.setTextColor(150,150,150);
-        doc.text(`${t?.name} · Page ${pg} of ${total}`, W/2, H-8, {align:'center'});
-        doc.text('Powered by Mr. Saisi Nyongesa Sammy', W-14, H-8, {align:'right'});
-      }
-    });
-  }
+  doc.text(settings.schoolName||'School',14,12);
+  doc.setFontSize(11); doc.setTextColor(20,60,50); doc.text(t?.name||'Teacher',14,20);
+  doc.setFontSize(7); doc.setTextColor(30,50,40); doc.text('Powered by Mr. Saisi Nyongesa Sammy',W-14,12,{align:'right'});
+  let y=32; doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,100,120);
+  if(t?.tsc){ doc.text(`TSC: ${t.tsc}`,14,y); y+=6; }
+  doc.text(`Generated: ${new Date().toLocaleString('en-KE')}`,14,y); y+=8;
+  if(!rows.length){ doc.setTextColor(150,150,150); doc.text('No records.',14,y+10); }
+  else { doc.autoTable({startY:y,head:[['Date','In','Out','Duration']],body:rows.map(r=>[r.date,r.in,r.out,r.dur]),styles:{fontSize:9,cellPadding:3,textColor:[30,40,60]},headStyles:{fillColor:[11,17,32],textColor:[15,212,192],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,250,252]},bodyStyles:{fillColor:[255,255,255],textColor:[30,40,60]},theme:'grid',didDrawPage:()=>{ const pg=doc.internal.getCurrentPageInfo().pageNumber,total=doc.internal.getNumberOfPages(); doc.setFontSize(7); doc.setTextColor(150,150,150); doc.text(`${t?.name} · Page ${pg} of ${total}`,W/2,H-8,{align:'center'}); doc.text('Powered by Mr. Saisi Nyongesa Sammy',W-14,H-8,{align:'right'}); }}); }
   doc.save(`${t?.name?.replace(/\s+/g,'_')}_attendance_${new Date().toISOString().slice(0,10)}.pdf`);
   showToast('📄 Individual PDF exported');
 }
 
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
+//  CHANGE PIN
+// ─────────────────────────────────────────────────────
+async function changePin(){
+  const cur=el('pin-cur').value.trim(), nw=el('pin-new').value.trim(), cfm=el('pin-cfm').value.trim(), errEl=el('pin-err');
+  errEl.style.display='none';
+  if(cur!==settings.pin){ errEl.textContent='❌ Current password incorrect.'; errEl.style.display='block'; return; }
+  if(nw.length<4){ errEl.textContent='❌ New password must be at least 4 characters.'; errEl.style.display='block'; return; }
+  if(nw!==cfm){ errEl.textContent='❌ Passwords do not match.'; errEl.style.display='block'; return; }
+  if(nw===cur){ errEl.textContent='❌ New password must differ from current.'; errEl.style.display='block'; return; }
+  settings.pin=nw; saveLocal();
+  if(DB==='firebase') await fbSaveSettings();
+  ['pin-cur','pin-new','pin-cfm'].forEach(id=>el(id).value='');
+  showToast('✅ Admin password updated');
+}
+
+// ─────────────────────────────────────────────────────
 //  NAVIGATION
-// ═══════════════════════════════════════════════════════
-function goPage(p) {
-  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
-  document.querySelectorAll('.bn-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById(`page-${p}`).classList.add('active');
-  document.getElementById(`bn-${p}`).classList.add('active');
+// ─────────────────────────────────────────────────────
+function goPage(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.bn').forEach(b=>b.classList.remove('on'));
+  el('page-'+p).classList.add('on');
+  const btn=el('bn-'+p);
+  if(btn) btn.classList.add('on');
 }
 
-// ═══════════════════════════════════════════════════════
-//  DEVICE ID + LIMIT MODAL
-// ═══════════════════════════════════════════════════════
-function getDeviceId() {
-  let id = localStorage.getItem('et_device_id');
-  if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,12); localStorage.setItem('et_device_id', id); }
-  return id;
-}
+// ─────────────────────────────────────────────────────
+//  DEVICE ID
+// ─────────────────────────────────────────────────────
+function getDevId(){ let id=localStorage.getItem('et_dev'); if(!id){ id='dev_'+Math.random().toString(36).slice(2,12); localStorage.setItem('et_dev',id); } return id; }
 
-function showDeviceLimitModal() {
-  document.getElementById('device-limit-modal').classList.add('open');
-}
-
-// ── Change Admin PIN ──
-function togglePinVis(inputId, btn) {
-  const inp = document.getElementById(inputId);
-  if (inp.type==='password') { inp.type='text'; btn.textContent='🙈'; }
-  else { inp.type='password'; btn.textContent='👁'; }
-}
-
-async function changeAdminPin() {
-  const current  = document.getElementById('pin-current').value.trim();
-  const newPin   = document.getElementById('pin-new').value.trim();
-  const confirm  = document.getElementById('pin-confirm').value.trim();
-  const errEl    = document.getElementById('pin-change-err');
-
-  errEl.style.display = 'none';
-
-  if (current !== settings.pin) {
-    errEl.textContent = '❌ Current password is incorrect.';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPin.length < 4) {
-    errEl.textContent = '❌ New password must be at least 4 characters.';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPin !== confirm) {
-    errEl.textContent = '❌ New passwords do not match.';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPin === current) {
-    errEl.textContent = '❌ New password must be different from the current one.';
-    errEl.style.display = 'block'; return;
-  }
-
-  settings.pin = newPin;
-  saveLocal();
-  if (DB_MODE==='firebase') await fbSaveSettings();
-
-  // Clear fields
-  document.getElementById('pin-current').value='';
-  document.getElementById('pin-new').value='';
-  document.getElementById('pin-confirm').value='';
-
-  showToast('✅ Admin password updated successfully');
-}
-
-// ═══════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────
 //  HELPERS
-// ═══════════════════════════════════════════════════════
-function haversine(a,b) {
-  const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
-  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-}
-function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function initials(n) { return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtSec(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60; return `${pad(h)}:${pad(m)}:${pad(sc)}`; }
-function pad(n) { return String(n).padStart(2,'0'); }
-function fmtMs(ms,short=false) { const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return short?(h>0?`${h}h ${m}m`:`${m}m`):(h>0?`${h}h ${m}m`:m>0?`${m}m ${s%60}s`:`${s%60}s`); }
-function updateClock() { document.getElementById('h-clock').textContent=new Date().toLocaleTimeString('en-KE',{hour12:false}); }
-function updateSyncDot() { document.getElementById('sync-dot').className=DB_MODE==='firebase'&&window._firebase?.firebaseReady?'sync-dot':'sync-dot offline'; }
-function showOfflineBanner(show) { document.getElementById('offline-bar').classList.toggle('show',show); }
+// ─────────────────────────────────────────────────────
+function el(id){ return document.getElementById(id); }
+function haversine(a,b){ const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180; const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2; return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function initials(n){ return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtSec(s){ const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60; return `${pad(h)}:${pad(m)}:${pad(sc)}`; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtMs(ms,sh=false){ const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return sh?(h>0?`${h}h ${m}m`:`${m}m`):(h>0?`${h}h ${m}m`:m>0?`${m}m ${s%60}s`:`${s%60}s`); }
+function tickClock(){ el('h-clock').textContent=new Date().toLocaleTimeString('en-KE',{hour12:false}); }
+function syncDot(){ el('sync-dot').className=DB==='firebase'&&window._fb?.ok?'sync-dot':'sync-dot off'; }
+function showOfflineBanner(v){ el('offline-bar').classList.toggle('show',v); }
+function toggleEye(inputId,btn){ const inp=el(inputId); if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}else{inp.type='password';btn.textContent='👁';} }
+let toastT; function showToast(msg){ const t=el('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),3200); }
+window.addEventListener('online',()=>{ showOfflineBanner(false); syncDot(); showToast('🟢 Back online'); });
+window.addEventListener('offline',()=>{ showOfflineBanner(true); syncDot(); showToast('🔴 Offline'); });
 
-let toastT;
-function showToast(msg) {
-  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3200);
-}
-
-// updateSyncDot is called from launchApp
-
-// ═══════════════════════════════════════════════════════
-//  PWA — Manifest + Service Worker + Install Prompt
-// ═══════════════════════════════════════════════════════
-(function setupPWA() {
-
-  // ── 1. Inject Web App Manifest as blob ──
-  const manifest = {
-    name: "EduTrack School Attendance",
-    short_name: "EduTrack",
-    description: "Geofenced school attendance system for teachers",
-    start_url: location.href,   // exact URL so install works from any host
-    display: "standalone",
-    background_color: "#0b1120",
-    theme_color: "#0fd4c0",
-    orientation: "portrait-primary",
-    categories: ["education", "productivity"],
-    icons: [
-      {
-        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF8WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNi4wLWMwMDMgNzkuMTY0NTI3LCAyMDIwLzEwLzE1LTE3OjQ4OjMyICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdFJlZj0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlUmVmIyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjIuMSAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NkFBNUM4RjhENEMyMTFFQjkzMDhGOEIxNjlCNTA2MDMiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NkFBNUM4RjlENEMyMTFFQjkzMDhGOEIxNjlCNTA2MDMiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo2QUE1QzhGNkQ0QzIxMUVCOTMwOEY4QjE2OUI1MDYwMyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo2QUE1QzhGN0Q0QzIxMUVCOTMwOEY4QjE2OUI1MDYwMyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pn3R3i8AABC9SURBVHja",
-        sizes: "192x192",
-        type: "image/png"
-      }
-    ]
-  };
-
-  // Build proper PNG icons using canvas for best compatibility
-  function makeIconDataURL(size) {
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
-    const ctx = c.getContext('2d');
-    // Background
-    const r = size * 0.18;
-    ctx.beginPath();
-    ctx.moveTo(r, 0); ctx.lineTo(size-r, 0);
-    ctx.quadraticCurveTo(size, 0, size, r);
-    ctx.lineTo(size, size-r);
-    ctx.quadraticCurveTo(size, size, size-r, size);
-    ctx.lineTo(r, size);
-    ctx.quadraticCurveTo(0, size, 0, size-r);
-    ctx.lineTo(0, r);
-    ctx.quadraticCurveTo(0, 0, r, 0);
-    ctx.closePath();
-    const grad = ctx.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, '#0fd4c0');
-    grad.addColorStop(1, '#38bdf8');
-    ctx.fillStyle = grad;
-    ctx.fill();
-    // Emoji
-    ctx.font = `${size * 0.55}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🏫', size / 2, size / 2 + size * 0.04);
-    return c.toDataURL('image/png');
+// ─────────────────────────────────────────────────────
+//  PWA — Service Worker + Install
+// ─────────────────────────────────────────────────────
+(function(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js',{scope:'./'})
+      .then(r=>console.log('✅ SW scope:',r.scope))
+      .catch(e=>console.warn('SW failed:',e.message));
   }
-
-  manifest.icons = [
-    { src: makeIconDataURL(192), sizes: '192x192', type: 'image/png', purpose: 'any' },
-    { src: makeIconDataURL(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-  ];
-
-  const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-  const mUrl  = URL.createObjectURL(mBlob);
-  const mLink = document.getElementById('pwa-manifest');
-  if (mLink) mLink.href = mUrl;
-
-  // ── 2. Service Worker — registered via blob with same-origin header trick ──
-  if ('serviceWorker' in navigator) {
-    const CACHE = 'edutrack-v3';
-    const sw = `
-const CACHE = '${CACHE}';
-self.addEventListener('install', e => {
-  self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(c =>
-      c.addAll([self.location.href.replace(/\/sw.*$/, '/')])
-        .catch(() => {})   // non-fatal if page isn't cacheable
-    )
-  );
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-self.addEventListener('fetch', e => {
-  // Only handle same-origin GET requests
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      })
-      .catch(() => caches.match(e.request))
-  );
-});`;
-
-    const swBlob = new Blob([sw], { type: 'application/javascript' });
-    const swUrl  = URL.createObjectURL(swBlob);
-
-    navigator.serviceWorker.register(swUrl)
-      .then(reg => {
-        console.log('✅ EduTrack SW registered, scope:', reg.scope);
-      })
-      .catch(err => {
-        console.warn('SW registration failed (expected when opened as local file):', err.message);
-      });
-  }
-
-  // ── 3. Android/Chrome — capture beforeinstallprompt ──
-  let deferredPrompt = null;
-
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
-    // Show our custom install banner after a short delay
-    setTimeout(() => showInstallBanner(), 1500);
-  });
-
-  // Hide banner after successful install
-  window.addEventListener('appinstalled', () => {
-    hideInstallBanner();
-    showToast('🎉 EduTrack installed successfully!');
-    deferredPrompt = null;
-    localStorage.setItem('pwa-installed', '1');
-  });
-
-  // Wire up Install button
-  const installBtn = document.getElementById('pwa-install-btn');
-  if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          showToast('⏳ Installing EduTrack…');
-        } else {
-          showToast('👍 You can install later from the browser menu');
-        }
-        deferredPrompt = null;
-        hideInstallBanner();
-      }
-    });
-  }
-
-  // ── 4. iOS Safari — show manual instructions once ──
-  const isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                       window.navigator.standalone === true;
-  const alreadyInstalled = localStorage.getItem('pwa-installed');
-
-  if (isIOS && !isStandalone && !alreadyInstalled && !localStorage.getItem('ios-hint-shown')) {
-    setTimeout(() => showIOSInstallSheet(), 2500);
-  }
-
-  // ── Helpers ──
-  function showInstallBanner() {
-    if (localStorage.getItem('pwa-installed')) return;
-    const b = document.getElementById('pwa-banner');
-    if (b) b.classList.add('show');
-  }
-
-  function hideInstallBanner() {
-    const b = document.getElementById('pwa-banner');
-    if (b) b.classList.remove('show');
-  }
-
-  function showIOSInstallSheet() {
-    document.getElementById('ios-install-sheet').classList.add('open');
-    localStorage.setItem('ios-hint-shown', '1');
-  }
-
-  // Expose for close button
-  window.hideInstallBanner = hideInstallBanner;
-  window.closeIOSSheet = () => document.getElementById('ios-install-sheet').classList.remove('open');
-
+  let deferred=null;
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; if(!localStorage.getItem('pwa-ok')) setTimeout(()=>el('pwa-banner').classList.add('on'),2000); });
+  window.addEventListener('appinstalled',()=>{ el('pwa-banner').classList.remove('on'); showToast('🎉 EduTrack installed!'); deferred=null; localStorage.setItem('pwa-ok','1'); });
+  const installBtn=el('pwa-install-btn');
+  if(installBtn) installBtn.addEventListener('click',async()=>{ if(!deferred) return; deferred.prompt(); const{outcome}=await deferred.userChoice; showToast(outcome==='accepted'?'⏳ Installing…':'👍 Install later from browser menu'); deferred=null; el('pwa-banner').classList.remove('on'); });
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStand=window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone===true;
+  if(isIOS&&!isStand&&!localStorage.getItem('pwa-ok')&&!localStorage.getItem('ios-hint')){ setTimeout(()=>{ el('ios-sheet').classList.add('open'); localStorage.setItem('ios-hint','1'); },3000); }
+  window.hidePWABanner=()=>el('pwa-banner').classList.remove('on');
+  window.closeIOSSheet=()=>el('ios-sheet').classList.remove('open');
 })();
 </script>
 </body>
