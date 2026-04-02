@@ -1,0 +1,56 @@
+{
+  "name": "EduTrack - School Attendance System",
+  "short_name": "EduTrack",
+  "description": "Multi-School Attendance System with Geofencing",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0fd4c0",
+  "background_color": "#0b1120",
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect width='540' height='720' fill='%230b1120'/><rect x='20' y='40' width='500' height='640' rx='20' fill='%231a2235'/><circle cx='270' cy='150' r='50' fill='%230fd4c0'/><text x='270' y='350' font-size='48' fill='%230fd4c0' text-anchor='middle' font-weight='bold'>EduTrack</text></svg>",
+      "sizes": "540x720",
+      "form_factor": "narrow",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Login",
+      "short_name": "Login",
+      "description": "Login to EduTrack",
+      "url": "/?mode=login",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230fd4c0'/><text y='.9em' font-size='80' x='10'>🔐</text></svg>",
+          "sizes": "100x100",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230fd4c0'/><text y='.9em' font-size='80' x='10'>🏫</text></svg>",
+      "sizes": "100x100",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230fd4c0'/><text y='1.4em' font-size='140' x='20'>🏫</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><defs><style>text{font-family:Arial;font-weight:bold;fill:white;dominant-baseline:middle;text-anchor:middle}</style></defs><rect width='512' height='512' rx='100' fill='%230fd4c0'/><text x='256' y='256' font-size='380'>🏫</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "prefer_related_applications": false
+}
