@@ -1,49 +1,66 @@
 {
-  "name": "EduTrack - Attendance Management System",
+  "name": "EduTrack · School Attendance",
   "short_name": "EduTrack",
-  "description": "Complete school attendance and time tracking system with geofencing capabilities",
-  "start_url": "/index.html",
-  "scope": "/",
+  "description": "Multi-School Attendance System with Geofencing",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#f59e0b",
   "background_color": "#0b1120",
+  "theme_color": "#0fd4c0",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "utilities"],
+
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23f59e0b' width='192' height='192' rx='44'/><text x='96' y='120' font-size='96' font-weight='bold' fill='%230b1120' text-anchor='middle' dominant-baseline='middle'>⭐</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='38' fill='%230fd4c0'/><text y='.85em' font-size='140' x='24'>🏫</text></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23f59e0b' width='192' height='192' rx='44'/><text x='96' y='120' font-size='96' font-weight='bold' fill='%230b1120' text-anchor='middle' dominant-baseline='middle'>⭐</text></svg>",
-      "sizes": "192x192",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='102' fill='%230fd4c0'/><text y='.85em' font-size='360' x='64'>🏫</text></svg>",
+      "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "business", "productivity"],
-  "screenshots": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%230b1120' width='540' height='720'/></svg>",
-      "sizes": "540x720",
-      "type": "image/svg+xml",
-      "form_factor": "narrow"
-    }
-  ],
+
+  "screenshots": [],
+
   "shortcuts": [
     {
-      "name": "Sign In",
-      "short_name": "Sign In",
-      "description": "Open EduTrack and sign in",
-      "url": "/index.html",
+      "name": "Clock In",
+      "short_name": "Clock In",
+      "description": "Go directly to the attendance clock-in page",
+      "url": "./index.html#attend",
       "icons": [
         {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%23f59e0b' width='96' height='96' rx='20'/><text x='48' y='60' font-size='48' font-weight='bold' fill='%230b1120' text-anchor='middle' dominant-baseline='middle'>⭐</text></svg>",
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' rx='20' fill='%230fd4c0'/><text y='.85em' font-size='72' x='12'>✅</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "short_name": "Reports",
+      "description": "View attendance reports",
+      "url": "./index.html#reports",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' rx='20' fill='%230b1120'/><text y='.85em' font-size='72' x='12'>📊</text></svg>",
           "sizes": "96x96",
           "type": "image/svg+xml"
         }
       ]
     }
-  ]
+  ],
+
+  "prefer_related_applications": false,
+
+  "related_applications": [],
+
+  "handle_links": "preferred"
 }
