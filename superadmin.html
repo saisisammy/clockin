@@ -713,11 +713,15 @@ function showToast(msg) {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/service-worker.js', {
-        scope: '/',
+      // Determine the correct scope path
+      const scriptDir = document.currentScript?.src || window.location.pathname;
+      const basePath = window.location.pathname.includes('/superadmin.html') ? '/' : '/';
+      
+      const registration = await navigator.serviceWorker.register('./service-worker.js', {
+        scope: basePath,
         updateViaCache: 'none'
       });
-      console.log('Service Worker registered successfully:', registration);
+      console.log('✅ Service Worker registered successfully:', registration);
       
       // Check for updates periodically
       setInterval(async () => {
@@ -741,7 +745,8 @@ if ('serviceWorker' in navigator) {
         });
       });
     } catch (err) {
-      console.error('Service Worker registration failed:', err);
+      console.error('❌ Service Worker registration failed:', err);
+      console.warn('Make sure the app is served over HTTPS or http://localhost');
     }
   });
   
@@ -752,6 +757,8 @@ if ('serviceWorker' in navigator) {
       window.location.reload();
     }
   });
+} else {
+  console.warn('⚠️ Service Workers are not supported in this browser');
 }
 </script>
 </body>
