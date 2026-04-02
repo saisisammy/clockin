@@ -19,7 +19,11 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
 const cfg = {
   apiKey:"AIzaSyDl0XxDhlF52VVk36i0DvrVLuFrGjwIdhE",
   authDomain:"clock-in-records.firebaseapp.com",
@@ -28,9 +32,18 @@ const cfg = {
   messagingSenderId:"643705157075",
   appId:"1:643705157075:web:03d8def9668b6e8c24ab26"
 };
-let db, ok=false;
-try { const app=initializeApp(cfg); db=getFirestore(app); ok=true; } catch(e){ console.warn('Firebase:',e.message); }
-window._fb = { db, ok, doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where };
+let db, auth, ok=false;
+try {
+  const app = initializeApp(cfg);
+  db   = getFirestore(app);
+  auth = getAuth(app);
+  ok   = true;
+} catch(e){ console.warn('Firebase:',e.message); }
+window._fb = {
+  db, auth, ok,
+  doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, query, where,
+  signInWithEmailAndPassword, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider
+};
 window.dispatchEvent(new Event('fb-ready'));
 </script>
 
@@ -488,17 +501,23 @@ header{position:sticky;top:0;z-index:200;height:60px;display:flex;align-items:ce
   <div class="login-box">
     <div class="login-icon">🛡</div>
     <div class="login-title">Admin Dashboard</div>
-    <div class="login-sub" id="admin-login-sub">Enter the admin PIN for this school</div>
+    <div class="login-sub" id="admin-login-sub">Sign in with your admin account</div>
     <div class="f-row">
-      <label class="f-lbl">PIN</label>
+      <label class="f-lbl">Email</label>
+      <input type="email" class="f-in" id="admin-email" placeholder="admin@school.ac.ke"
+        autocomplete="username"
+        onkeydown="if(event.key==='Enter')document.getElementById('admin-pass').focus()">
+    </div>
+    <div class="f-row">
+      <label class="f-lbl">Password</label>
       <div class="pin-wrap">
-        <input type="password" class="f-in" id="admin-pin" placeholder="••••" maxlength="8"
-          onkeydown="if(event.key==='Enter')doAdminLogin()">
-        <button class="pin-eye" onclick="toggleEye('admin-pin',this)">👁</button>
+        <input type="password" class="f-in" id="admin-pass" placeholder="••••••••" maxlength="64"
+          autocomplete="current-password" onkeydown="if(event.key==='Enter')doAdminLogin()">
+        <button class="pin-eye" type="button" onclick="toggleEye('admin-pass',this)">👁</button>
       </div>
     </div>
-    <div class="login-err" id="admin-err">Incorrect PIN. Try again.</div>
-    <button class="btn btn-t btn-full" onclick="doAdminLogin()" style="margin-bottom:10px">Enter Dashboard</button>
+    <div class="login-err" id="admin-err">Incorrect email or password. Try again.</div>
+    <button class="btn btn-t btn-full" id="admin-login-btn" onclick="doAdminLogin()" style="margin-bottom:10px">🛡 Sign In to Dashboard</button>
     <button class="btn btn-gh btn-full" onclick="closeAdminLogin()">Cancel</button>
   </div>
 </div>
@@ -694,14 +713,24 @@ header{position:sticky;top:0;z-index:200;height:60px;display:flex;align-items:ce
     <div class="card">
       <div class="card-head"><span class="card-ttl">🔐 Change Admin Password</span></div>
       <div class="card-body">
+        <div style="font-size:12px;color:var(--tx3);margin-bottom:14px;line-height:1.6">
+          Enter your current password to verify, then set a new one. Your Firebase account password will be updated.
+        </div>
         <div class="f-row"><label class="f-lbl">Current Password</label>
-          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cur" placeholder="Current PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-cur',this)">👁</button></div></div>
-        <div class="f-row"><label class="f-lbl">New Password (min 4)</label>
-          <div class="pin-wrap"><input type="password" class="f-in" id="pin-new" placeholder="New PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-new',this)">👁</button></div></div>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cur" placeholder="Current password" maxlength="64"><button class="pin-eye" type="button" onclick="toggleEye('pin-cur',this)">👁</button></div></div>
+        <div class="f-row"><label class="f-lbl">New Password (min 6 chars)</label>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-new" placeholder="New password" maxlength="64"><button class="pin-eye" type="button" onclick="toggleEye('pin-new',this)">👁</button></div></div>
         <div class="f-row"><label class="f-lbl">Confirm New Password</label>
-          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cfm" placeholder="Repeat PIN" maxlength="8"><button class="pin-eye" onclick="toggleEye('pin-cfm',this)">👁</button></div></div>
+          <div class="pin-wrap"><input type="password" class="f-in" id="pin-cfm" placeholder="Repeat new password" maxlength="64"><button class="pin-eye" type="button" onclick="toggleEye('pin-cfm',this)">👁</button></div></div>
         <div id="pin-err" style="font-size:12px;color:var(--rose);margin-bottom:10px;display:none"></div>
         <button class="btn btn-t" onclick="changePin()">🔑 Update Password</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-ttl">🚪 Session</span></div>
+      <div class="card-body">
+        <div style="font-size:13px;color:var(--tx2);margin-bottom:14px" id="admin-email-display">Signed in as admin</div>
+        <button class="btn btn-d" onclick="doAdminLogout()">🚪 Sign Out of Admin</button>
       </div>
     </div>
   </div>
@@ -798,7 +827,7 @@ let fb = null;          // firebase helpers
 let schoolId = null;    // currently active school
 let allSchools = [];    // loaded by school selector
 
-let settings  = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234' };
+let settings  = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234', adminEmail:'' };
 let teachers  = [];
 let records   = [];
 let sessions  = {};     // { teacherId: isoTimestamp }
@@ -806,6 +835,7 @@ let sessions  = {};     // { teacherId: isoTimestamp }
 let userPos   = null, isInside = false;
 let selTeacher = null;
 let adminOK   = false;
+let adminUser = null;   // Firebase Auth user object for signed-in admin
 let sessTimer = null;
 let pendDelId = null;
 let selectColleague = false;
@@ -900,8 +930,9 @@ async function enterSchool(id) {
   closeSchoolSel();
   // Reset state
   teachers=[]; records=[]; sessions={};
-  settings = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234' };
+  settings = { schoolName:'', lat:null, lng:null, radius:300, pin:'1234', adminEmail:'' };
   adminOK = false;
+  adminUser = null;
   selTeacher = null;
   unsubs.forEach(u=>u()); unsubs=[];
   stopSessTimer();
@@ -931,7 +962,9 @@ async function enterSchool(id) {
 function goSwitchSchool() {
   if (!schoolId) return;
   unsubs.forEach(u=>u()); unsubs=[];
-  stopSessTimer(); selTeacher=null; adminOK=false;
+  stopSessTimer(); selTeacher=null;
+  if(adminOK && DB==='firebase'){ try{ fb.signOut(fb.auth); }catch(e){} }
+  adminOK=false; adminUser=null;
   clearTeacherUI();
   openSchoolSel();
   goPage('clock');
@@ -1345,26 +1378,103 @@ function renderTodayLog(){
 }
 
 // ─────────────────────────────────────────────────────
-//  ADMIN AUTH
+//  ADMIN AUTH — Firebase Email / Password
 // ─────────────────────────────────────────────────────
 function requireAdmin(){
   if(adminOK){ goPage('admin'); return; }
-  el('admin-login-sub').textContent='Enter the admin PIN for '+(settings.schoolName||'this school');
-  el('admin-err').style.display='none';
-  el('admin-pin').value='';
+  const school = settings.schoolName || 'this school';
+  el('admin-login-sub').textContent = 'Sign in to manage ' + school;
+  el('admin-err').style.display = 'none';
+  el('admin-email').value = '';
+  el('admin-pass').value  = '';
   el('admin-login').classList.add('open');
-  setTimeout(()=>el('admin-pin').focus(),150);
+  setTimeout(() => el('admin-email').focus(), 150);
 }
-function doAdminLogin(){
-  if(el('admin-pin').value===settings.pin){
-    el('admin-login').classList.remove('open'); el('admin-pin').value='';
-    el('admin-err').style.display='none';
-    adminOK=true; goPage('admin'); refreshAdmin();
-  } else {
-    el('admin-err').style.display='block'; el('admin-pin').value='';
+
+async function doAdminLogin(){
+  const email  = el('admin-email').value.trim();
+  const pass   = el('admin-pass').value;
+  const errEl  = el('admin-err');
+  const btn    = el('admin-login-btn');
+
+  errEl.style.display = 'none';
+  if (!email) { errEl.textContent = '❌ Email is required.'; errEl.style.display = 'block'; return; }
+  if (!pass)  { errEl.textContent = '❌ Password is required.'; errEl.style.display = 'block'; return; }
+
+  if (DB !== 'firebase') {
+    errEl.textContent = '❌ Firebase not connected. Check your internet.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Signing in…';
+
+  try {
+    const { auth, signInWithEmailAndPassword } = fb;
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+
+    // Verify this email is authorised for the current school
+    const authorisedEmail = (settings.adminEmail || '').toLowerCase().trim();
+    if (authorisedEmail && cred.user.email.toLowerCase() !== authorisedEmail) {
+      await fb.signOut(auth);
+      errEl.textContent = '❌ This account is not authorised for ' + (settings.schoolName || 'this school') + '.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // ✅ Success
+    adminUser = cred.user;
+    el('admin-login').classList.remove('open');
+    el('admin-email').value = '';
+    el('admin-pass').value  = '';
+    errEl.style.display = 'none';
+    adminOK = true;
+
+    // Show signed-in email in settings tab
+    const disp = el('admin-email-display');
+    if (disp) disp.textContent = '📧 Signed in as: ' + cred.user.email;
+
+    goPage('admin');
+    refreshAdmin();
+  } catch (e) {
+    errEl.textContent = '❌ ' + adminAuthError(e.code);
+    errEl.style.display = 'block';
+    el('admin-pass').value = '';
+    setTimeout(() => el('admin-pass').focus(), 50);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🛡 Sign In to Dashboard';
   }
 }
-function closeAdminLogin(){ el('admin-login').classList.remove('open'); el('admin-pin').value=''; }
+
+function closeAdminLogin(){
+  el('admin-login').classList.remove('open');
+  el('admin-email').value = '';
+  el('admin-pass').value  = '';
+}
+
+async function doAdminLogout(){
+  adminOK = false;
+  adminUser = null;
+  if (DB === 'firebase') {
+    try { await fb.signOut(fb.auth); } catch(e) {}
+  }
+  goPage('clock');
+  showToast('👋 Signed out of admin');
+}
+
+function adminAuthError(code) {
+  switch (code) {
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential': return 'Incorrect email or password.';
+    case 'auth/invalid-email':      return 'Invalid email address.';
+    case 'auth/too-many-requests':  return 'Too many attempts. Try again later.';
+    case 'auth/network-request-failed': return 'Network error. Check your connection.';
+    default: return 'Sign in failed. Try again.';
+  }
+}
 
 // ─────────────────────────────────────────────────────
 //  ADMIN SECTIONS
@@ -1534,19 +1644,42 @@ function exportIndPDF(id){
 }
 
 // ─────────────────────────────────────────────────────
-//  CHANGE PIN
+//  CHANGE ADMIN PASSWORD (Firebase Auth)
 // ─────────────────────────────────────────────────────
 async function changePin(){
   const cur=el('pin-cur').value.trim(), nw=el('pin-new').value.trim(), cfm=el('pin-cfm').value.trim(), errEl=el('pin-err');
   errEl.style.display='none';
-  if(cur!==settings.pin){ errEl.textContent='❌ Current password incorrect.'; errEl.style.display='block'; return; }
-  if(nw.length<4){ errEl.textContent='❌ New password must be at least 4 characters.'; errEl.style.display='block'; return; }
+  if(!cur){ errEl.textContent='❌ Enter your current password.'; errEl.style.display='block'; return; }
+  if(nw.length<6){ errEl.textContent='❌ New password must be at least 6 characters.'; errEl.style.display='block'; return; }
   if(nw!==cfm){ errEl.textContent='❌ Passwords do not match.'; errEl.style.display='block'; return; }
   if(nw===cur){ errEl.textContent='❌ New password must differ from current.'; errEl.style.display='block'; return; }
-  settings.pin=nw; saveLocal();
-  if(DB==='firebase') await fbSaveSettings();
-  ['pin-cur','pin-new','pin-cfm'].forEach(id=>el(id).value='');
-  showToast('✅ Admin password updated');
+
+  if(DB==='firebase' && adminUser){
+    try {
+      const { reauthenticateWithCredential, EmailAuthProvider, updatePassword } = fb;
+      // Re-authenticate first (required for sensitive operations)
+      const credential = EmailAuthProvider.credential(adminUser.email, cur);
+      await reauthenticateWithCredential(adminUser, credential);
+      await updatePassword(adminUser, nw);
+      ['pin-cur','pin-new','pin-cfm'].forEach(id=>el(id).value='');
+      showToast('✅ Password updated successfully');
+    } catch(e) {
+      if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+        errEl.textContent='❌ Current password is incorrect.';
+      } else if(e.code==='auth/requires-recent-login'){
+        errEl.textContent='❌ Please sign out and sign back in, then try again.';
+      } else {
+        errEl.textContent='❌ Failed to update password: '+(e.message||e.code);
+      }
+      errEl.style.display='block';
+    }
+  } else {
+    // Fallback: local PIN update
+    if(cur!==settings.pin){ errEl.textContent='❌ Current password incorrect.'; errEl.style.display='block'; return; }
+    settings.pin=nw; saveLocal();
+    ['pin-cur','pin-new','pin-cfm'].forEach(id=>el(id).value='');
+    showToast('✅ Admin password updated');
+  }
 }
 
 // ─────────────────────────────────────────────────────
